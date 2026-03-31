@@ -1,0 +1,761 @@
+/* ============================================
+   Dynamic Table Manager - Styles
+   ============================================ */
+
+/* --- Sidebar Customizations --- */
+
+.dtm-search {
+  padding: 4px 8px;
+}
+
+.dtm-search input {
+  width: 100%;
+  height: 28px;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  background: var(--color-bg-option, rgba(0, 0, 0, 0.3));
+  color: var(--color-text-light-primary, #eee);
+}
+
+.dtm-search input::placeholder {
+  color: var(--color-text-light-tertiary, #888);
+}
+
+.dtm-folder-create {
+  background: none;
+  border: none;
+  color: var(--color-text-light-tertiary, #888);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.dtm-folder-create:hover {
+  color: var(--color-text-light-primary, #eee);
+  opacity: 1;
+}
+
+button.dtm-create-table {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* --- Table Editor Window --- */
+
+.dtm-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 8px;
+  padding: 8px;
+  overflow: hidden;
+}
+
+/* Header fields */
+.dtm-editor-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.dtm-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dtm-field-group label {
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: var(--color-text-light-tertiary, #999);
+  letter-spacing: 0.5px;
+}
+
+.dtm-field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.dtm-formula-group {
+  flex: 1;
+}
+
+.dtm-editor-header input,
+.dtm-editor-header textarea {
+  width: 100%;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  padding: 4px 8px;
+  background: var(--color-bg-option, rgba(0, 0, 0, 0.15));
+  color: var(--color-text-light-primary, #eee);
+  font-size: 13px;
+}
+
+.dtm-editor-header textarea {
+  resize: vertical;
+  min-height: 36px;
+}
+
+#dtm-table-name {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+#dtm-formula {
+  font-family: var(--font-mono, "Courier New", monospace);
+}
+
+.dtm-auto-formula-btn {
+  align-self: flex-end;
+  flex: 0 0 auto;
+  height: 29px;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+/* Toolbar */
+.dtm-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 4px 0;
+  border-top: 1px solid var(--color-border-light-tertiary, #444);
+  border-bottom: 1px solid var(--color-border-light-tertiary, #444);
+}
+
+.dtm-toolbar-left,
+.dtm-toolbar-right {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.dtm-toolbar button {
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dtm-toolbar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dtm-toolbar button i {
+  margin-right: 2px;
+}
+
+/* Column Headers */
+.dtm-row-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-light-tertiary, #888);
+  flex-shrink: 0;
+}
+
+/* Row List */
+.dtm-row-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Individual Rows */
+.dtm-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  transition: background-color 0.15s;
+}
+
+.dtm-row:hover {
+  background: var(--color-bg-option, rgba(255, 255, 255, 0.05));
+  border-color: var(--color-border-light-tertiary, #555);
+}
+
+/* Drag-over highlight — row will be populated/replaced */
+.dtm-row.dtm-drag-over {
+  background: rgba(100, 160, 255, 0.12);
+  border-color: rgba(100, 160, 255, 0.6);
+  outline: 1px solid rgba(100, 160, 255, 0.4);
+}
+
+/* Insert indicator — horizontal line shown between rows */
+.dtm-insert-indicator {
+  height: 2px;
+  margin: 1px 8px;
+  background: rgba(100, 160, 255, 0.8);
+  border-radius: 1px;
+  pointer-events: none;
+  position: relative;
+}
+
+.dtm-insert-indicator::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(100, 160, 255, 0.9);
+}
+
+/* Column widths — Range and Type are fixed/small, Content gets remaining space */
+.dtm-col-range {
+  flex: 0 0 60px;
+  font-family: var(--font-mono, "Courier New", monospace);
+  text-align: center;
+}
+
+.dtm-col-type {
+  flex: 0 0 90px;
+}
+
+.dtm-col-content {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dtm-col-actions {
+  flex: 0 0 28px;
+  text-align: center;
+}
+
+/* Name input inside content cell fills remaining space */
+.dtm-col-content input[type="text"] {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Row inputs */
+.dtm-row input[type="text"],
+.dtm-row select {
+  width: 100%;
+  height: 28px;
+  border: 1px solid var(--color-border-light-tertiary, #444);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  background: var(--color-bg-option, rgba(0, 0, 0, 0.1));
+  color: var(--color-text-light-primary, #eee);
+}
+
+.dtm-row input[type="text"]:focus,
+.dtm-row select:focus {
+  border-color: var(--color-border-highlight, #7a7971);
+  outline: none;
+}
+
+.dtm-row select option {
+  background: #1a1a2e;
+  color: #ddd;
+}
+
+/* Delete button */
+.dtm-col-actions button {
+  background: none;
+  border: none;
+  color: var(--color-text-light-tertiary, #888);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.dtm-col-actions button:hover {
+  color: #ff4444;
+  background: rgba(255, 68, 68, 0.1);
+}
+
+/* Description editor button (page icon, left of name field) */
+.dtm-desc-btn {
+  flex: 0 0 auto;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--color-text-light-tertiary, #888);
+  cursor: pointer;
+  padding: 2px 5px;
+  font-size: 12px;
+  line-height: 1;
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.dtm-desc-btn:hover:not(:disabled) {
+  color: var(--color-text-light-primary, #eee);
+  border-color: var(--color-border-light-tertiary, #555);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dtm-desc-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+/* Drop target for Document/Compendium results */
+.dtm-drop-target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  border: 1px dashed var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.dtm-drop-target:hover,
+.dtm-drop-target.dragover {
+  border-color: var(--color-border-highlight, #7a7971);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dtm-result-img {
+  width: 20px;
+  height: 20px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.dtm-result-name {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dtm-drop-hint {
+  font-size: 11px;
+  color: var(--color-text-light-tertiary, #777);
+  font-style: italic;
+}
+
+.dtm-result-name:not(:empty) + .dtm-drop-hint {
+  display: none;
+}
+
+/* Empty state */
+.dtm-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--color-text-light-tertiary, #888);
+  text-align: center;
+}
+
+.dtm-empty-state p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* --- Create Table Dialog --- */
+
+.dtm-create-dialog-container {
+  padding: 8px;
+}
+
+.dtm-create-dialog-container .dtm-field-group {
+  margin-bottom: 10px;
+}
+
+.dtm-create-dialog-container .dtm-field-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dtm-create-dialog-container input,
+.dtm-create-dialog-container select {
+  width: 100%;
+  height: 30px;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 13px;
+  background: var(--color-bg-option, rgba(0, 0, 0, 0.15));
+  color: var(--color-text-light-primary, #eee);
+}
+
+.dtm-create-dialog-container option {
+  background: #1a1a2e;
+  color: #ddd;
+}
+
+.dtm-create-dialog-container option:disabled {
+  background: #1a1a2e;
+  color: #666;
+  font-style: italic;
+}
+
+/* Link toggle column — sits left of Range in header and each row */
+.dtm-col-link {
+  flex: 0 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dtm-link-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-light-tertiary, #888);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.3;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.dtm-link-btn:hover:not(:disabled) {
+  opacity: 1;
+  color: rgba(100, 160, 255, 0.9);
+}
+
+.dtm-link-btn.dtm-linked {
+  color: rgba(100, 160, 255, 0.85);
+  opacity: 1;
+}
+
+.dtm-link-btn:disabled {
+  opacity: 0.1;
+  cursor: not-allowed;
+}
+
+/* Greyed-out range input for linked rows */
+input.dtm-col-range:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* --- Compound table banner (editor) --- */
+
+.dtm-compound-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(100, 160, 255, 0.1);
+  border: 1px solid rgba(100, 160, 255, 0.3);
+  border-radius: 4px;
+  font-size: 12px;
+  color: rgba(160, 200, 255, 0.9);
+  flex-shrink: 0;
+}
+
+.dtm-compound-banner i {
+  flex-shrink: 0;
+}
+
+/* --- Paste Table section --- */
+
+.dtm-paste-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dtm-create-dialog-container textarea {
+  width: 100%;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: var(--font-mono, "Courier New", monospace);
+  background: var(--color-bg-option, rgba(0, 0, 0, 0.15));
+  color: var(--color-text-light-primary, #eee);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.dtm-btn-parse {
+  align-self: flex-start;
+  padding: 5px 14px;
+  font-size: 13px;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-light-primary, #eee);
+}
+
+.dtm-btn-parse:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.dtm-btn-parse i {
+  margin-right: 4px;
+}
+
+/* Preview panel */
+.dtm-parse-preview {
+  border: 1px solid var(--color-border-light-tertiary, #444);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dtm-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--color-border-light-tertiary, #444);
+  font-size: 11px;
+}
+
+.dtm-preview-title {
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-light-tertiary, #999);
+}
+
+.dtm-preview-formula {
+  color: var(--color-text-light-secondary, #ccc);
+}
+
+.dtm-preview-count {
+  margin-left: auto;
+  color: var(--color-text-light-tertiary, #888);
+}
+
+.dtm-preview-rows {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.dtm-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.dtm-preview-row:last-child {
+  border-bottom: none;
+}
+
+.dtm-preview-range {
+  flex: 0 0 36px;
+  font-family: var(--font-mono, "Courier New", monospace);
+  font-size: 11px;
+  color: var(--color-text-light-tertiary, #888);
+  text-align: right;
+}
+
+.dtm-preview-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-light-primary, #eee);
+}
+
+/* --- Multi-column warning --- */
+
+.dtm-multi-warning {
+  border: 1px solid rgba(255, 190, 80, 0.4);
+  border-radius: 4px;
+  background: rgba(255, 190, 80, 0.07);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dtm-multi-warning-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(255, 210, 120, 0.95);
+}
+
+.dtm-multi-warning-header i {
+  font-size: 14px;
+}
+
+.dtm-multi-col-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--color-text-light-tertiary, #888);
+}
+
+.dtm-multi-col-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dtm-col-tag {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 190, 80, 0.15);
+  border: 1px solid rgba(255, 190, 80, 0.3);
+  font-size: 11px;
+  color: var(--color-text-light-primary, #ddd);
+}
+
+.dtm-col-tag em {
+  color: var(--color-text-light-tertiary, #888);
+  font-style: normal;
+}
+
+.dtm-multi-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dtm-radio-label,
+.dtm-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--color-text-light-primary, #ddd);
+  line-height: 1.4;
+}
+
+.dtm-radio-label input[type="radio"],
+.dtm-checkbox-label input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  min-width: 13px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: rgba(100, 160, 255, 0.9);
+  flex-shrink: 0;
+}
+
+.dtm-radio-label em,
+.dtm-checkbox-label em {
+  color: var(--color-text-light-tertiary, #888);
+  font-style: normal;
+}
+
+.dtm-compound-option {
+  padding-left: 20px;
+  color: rgba(160, 200, 255, 0.9);
+}
+
+/* Multi-column preview grid */
+.dtm-multi-preview-grid {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.dtm-multi-preview-col {
+  flex: 1;
+  min-width: 120px;
+  border: 1px solid var(--color-border-light-tertiary, #444);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dtm-preview-col-header {
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--color-border-light-tertiary, #444);
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-light-tertiary, #999);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dtm-preview-more {
+  padding: 3px 10px;
+  font-size: 10px;
+  color: var(--color-text-light-tertiary, #777);
+  font-style: italic;
+}
+
+/* --- Dialog buttons --- */
+.dtm-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-light-tertiary, #444);
+}
+
+.dtm-btn-primary,
+.dtm-btn-secondary {
+  padding: 6px 16px;
+  font-size: 13px;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.dtm-btn-primary {
+  background: var(--color-bg-btn-primary, #522e52);
+  color: var(--color-text-light-primary, #eee);
+}
+
+.dtm-btn-primary:hover {
+  background: var(--color-bg-btn-primary-hover, #6a3e6a);
+}
+
+.dtm-btn-secondary {
+  background: transparent;
+}
+
+.dtm-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dtm-btn-primary i,
+.dtm-btn-secondary i {
+  margin-right: 4px;
+}

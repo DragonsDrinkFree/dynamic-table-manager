@@ -1,0 +1,122 @@
+{{!-- Table Editor Popout Window --}}
+<div class="dtm-editor-container">
+
+  {{!-- Header: Table Name, Formula, Description --}}
+  <section class="dtm-editor-header">
+    <div class="dtm-field-group">
+      <label for="dtm-table-name">Table Name</label>
+      <input id="dtm-table-name" type="text" data-field="name" value="{{tableName}}" placeholder="Table Name" />
+    </div>
+
+    <div class="dtm-field-row">
+      <div class="dtm-field-group dtm-formula-group">
+        <label for="dtm-formula">Formula</label>
+        <input id="dtm-formula" type="text" data-field="formula" value="{{formula}}" placeholder="e.g. d6, 2d6, d100+5" />
+      </div>
+      <button type="button" data-action="autoFormula" class="dtm-auto-formula-btn" title="Set formula to d(number of rows)">
+        <i class="fas fa-calculator"></i>
+      </button>
+    </div>
+
+    <div class="dtm-field-group">
+      <label for="dtm-description">Description</label>
+      <textarea id="dtm-description" data-field="description" rows="2" placeholder="Table description...">{{description}}</textarea>
+    </div>
+  </section>
+
+  {{!-- Compound table banner --}}
+  {{#if isCompound}}
+  <div class="dtm-compound-banner">
+    <i class="fas fa-link"></i>
+    Compound table — Roll draws from all linked tables simultaneously.
+  </div>
+  {{/if}}
+
+  {{!-- Toolbar --}}
+  <section class="dtm-toolbar">
+    <div class="dtm-toolbar-left">
+      <button type="button" data-action="addRow" title="Add Row">
+        <i class="fas fa-plus"></i> Add Row
+      </button>
+      <button type="button" data-action="addRowsFromFormula" title="Add Rows from Formula">
+        <i class="fas fa-dice"></i> Add Rows from Formula
+      </button>
+      <button type="button" data-action="rollTable" title="Roll Table">
+        <i class="fas fa-dice-d20"></i> Roll
+      </button>
+    </div>
+    <div class="dtm-toolbar-right">
+      <button type="button" data-action="undo" title="Undo (Ctrl+Z)" {{#unless canUndo}}disabled{{/unless}}>
+        <i class="fas fa-undo"></i>
+      </button>
+      <button type="button" data-action="redo" title="Redo (Ctrl+Y)" {{#unless canRedo}}disabled{{/unless}}>
+        <i class="fas fa-redo"></i>
+      </button>
+      <button type="button" data-action="revertSnapshot" title="Revert to Original">
+        <i class="fas fa-history"></i> Revert
+      </button>
+    </div>
+  </section>
+
+  {{!-- Column Headers --}}
+  <div class="dtm-row-header">
+    <button type="button" class="dtm-col-link dtm-link-btn{{#if linkedAll}} dtm-linked{{/if}}" data-action="linkAll" title="{{#if linkedAll}}Unlink all rows{{else}}Link all rows{{/if}}">
+      <i class="fas fa-link"></i>
+    </button>
+    <span class="dtm-col-range">Range</span>
+    <span class="dtm-col-type">Type</span>
+    <span class="dtm-col-content">Content</span>
+    <span class="dtm-col-actions"></span>
+  </div>
+
+  {{!-- Row List --}}
+  <section class="dtm-row-list">
+    {{#each results}}
+    <div class="dtm-row" data-result-id="{{this.id}}">
+      <button type="button" class="dtm-col-link dtm-link-btn{{#if this.linked}} dtm-linked{{/if}}" data-action="toggleLink" title="{{#if this.linked}}Unlink row{{else}}Link to row above{{/if}}" {{#if @first}}disabled{{/if}}>
+        <i class="fas fa-link"></i>
+      </button>
+      <input class="dtm-col-range" type="text" data-field="range" value="{{this.rangeDisplay}}" {{#if this.linked}}disabled{{/if}} title="Single number or range (e.g. 5 or 3-8)" />
+
+      <select class="dtm-col-type" data-field="type" data-current-type="{{this.type}}">
+        {{#each ../resultTypeOptions}}
+        <option value="{{this.value}}">{{this.label}}</option>
+        {{/each}}
+      </select>
+
+      <div class="dtm-col-content">
+        {{#if this.isText}}
+          {{!-- Text result: page icon opens description editor, name field is inline --}}
+          <button type="button" class="dtm-desc-btn" data-action="editDescription" title="Edit full description">
+            <i class="fas fa-file-alt"></i>
+          </button>
+          <input type="text" data-field="name" value="{{this.name}}" placeholder="Result name..." />
+        {{else}}
+          {{!-- Document result: edit button opens the linked document's sheet --}}
+          <button type="button" class="dtm-desc-btn" data-action="openDocument" title="Open document sheet" {{#unless this.documentUuid}}disabled{{/unless}}>
+            <i class="fas fa-external-link-alt"></i>
+          </button>
+          <div class="dtm-drop-target">
+            {{#if this.img}}<img class="dtm-result-img" src="{{this.img}}" alt="" />{{/if}}
+            <span class="dtm-result-name">{{this.name}}</span>
+            <span class="dtm-drop-hint">Drop a {{this.typeLabel}} here</span>
+          </div>
+        {{/if}}
+      </div>
+
+      <div class="dtm-col-actions">
+        <button type="button" data-action="deleteRow" title="Delete Row">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    </div>
+    {{/each}}
+
+    {{#unless results.length}}
+    <div class="dtm-empty-state">
+      <p>No rows yet. Use <strong>Add Row</strong> or <strong>Add Rows from Formula</strong> to get started.</p>
+    </div>
+    {{/unless}}
+  </section>
+
+</div>

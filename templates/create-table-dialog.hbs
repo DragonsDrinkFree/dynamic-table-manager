@@ -1,0 +1,128 @@
+{{!-- Create New Table Dialog --}}
+<div class="dtm-create-dialog-container">
+  <form autocomplete="off">
+
+    <div class="dtm-field-group">
+      <label for="dtm-new-name">Table Name</label>
+      <input id="dtm-new-name" type="text" name="name" value="{{name}}" placeholder="{{defaultName}}" />
+    </div>
+
+    <div class="dtm-field-row">
+      <div class="dtm-field-group" style="flex:1">
+        <label for="dtm-new-type">Table Type</label>
+        <select id="dtm-new-type" name="tableType">
+          {{#each tableTypes}}
+          <option value="{{this.value}}">{{this.label}}</option>
+          {{/each}}
+        </select>
+      </div>
+
+      <div class="dtm-field-group" style="flex:1">
+        <label for="dtm-new-method">Creation Method</label>
+        <select id="dtm-new-method" name="creationMethod">
+          {{#each creationMethods}}
+          <option value="{{this.value}}" {{#if this.disabled}}disabled{{/if}}>{{this.label}}</option>
+          {{/each}}
+        </select>
+      </div>
+    </div>
+
+    {{!-- Paste Table UI --}}
+    {{#if isPaste}}
+    <div class="dtm-paste-section">
+      <div class="dtm-field-group">
+        <label for="dtm-paste-content">Paste Table Text</label>
+        <textarea id="dtm-paste-content" name="pasteContent" rows="9"
+          placeholder="Paste your table here (copied from a PDF or other source)..."></textarea>
+      </div>
+
+      <button type="button" data-action="parse" class="dtm-btn-parse">
+        <i class="fas fa-magic"></i> Parse Table
+      </button>
+
+      {{!-- Multi-column warning --}}
+      {{#if isMulti}}
+      <div class="dtm-multi-warning">
+        <div class="dtm-multi-warning-header">
+          <i class="fas fa-columns"></i>
+          <strong>Multiple columns detected</strong>
+          <span class="dtm-multi-col-count">{{parsed.columnCount}} columns</span>
+        </div>
+
+        <div class="dtm-multi-col-tags">
+          {{#each multiColumns}}
+          <span class="dtm-col-tag">{{this.header}} <em>({{this.count}})</em></span>
+          {{/each}}
+        </div>
+
+        <div class="dtm-multi-options">
+          <label class="dtm-radio-label">
+            <input type="radio" name="splitMode" value="split" {{#if splitMode}}checked{{/if}} />
+            Split into separate tables
+          </label>
+          {{#if splitMode}}
+          <label class="dtm-checkbox-label dtm-compound-option">
+            <input type="checkbox" name="makeCompound" {{#if makeCompound}}checked{{/if}} />
+            Create compound table that rolls all sub-tables together
+          </label>
+          {{/if}}
+          <label class="dtm-radio-label">
+            <input type="radio" name="splitMode" value="merge" {{#unless splitMode}}checked{{/unless}} />
+            Merge into single table <em>(prefixes each row with column name)</em>
+          </label>
+        </div>
+
+        {{!-- Column previews --}}
+        <div class="dtm-multi-preview-grid">
+          {{#each multiColumns}}
+          <div class="dtm-multi-preview-col">
+            <div class="dtm-preview-col-header">{{this.header}}</div>
+            <div class="dtm-preview-rows">
+              {{#each this.sample}}
+              <div class="dtm-preview-row">
+                <span class="dtm-preview-range">{{#if (eq this.low this.high)}}{{this.low}}{{else}}{{this.low}}–{{this.high}}{{/if}}</span>
+                <span class="dtm-preview-name">{{this.name}}</span>
+              </div>
+              {{/each}}
+              {{#if (eq this.count 3)}}{{else}}
+              <div class="dtm-preview-more">+{{subtract this.count 3}} more…</div>
+              {{/if}}
+            </div>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+
+      {{!-- Single-column preview --}}
+      {{else}}{{#if singleEntries}}
+      <div class="dtm-parse-preview">
+        <div class="dtm-preview-header">
+          <span class="dtm-preview-title">Preview</span>
+          {{#if parsed.formula}}<span class="dtm-preview-formula">Formula: <strong>{{parsed.formula}}</strong></span>{{/if}}
+          <span class="dtm-preview-count">{{singleEntries.length}} rows</span>
+        </div>
+        <div class="dtm-preview-rows">
+          {{#each singleEntries}}
+          <div class="dtm-preview-row">
+            <span class="dtm-preview-range">{{#if (eq this.low this.high)}}{{this.low}}{{else}}{{this.low}}–{{this.high}}{{/if}}</span>
+            <span class="dtm-preview-name">{{this.name}}</span>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+      {{/if}}{{/if}}
+
+    </div>
+    {{/if}}
+
+    <div class="dtm-dialog-buttons">
+      <button type="button" data-action="create" class="dtm-btn-primary">
+        <i class="fas fa-check"></i> Create
+      </button>
+      <button type="button" data-action="cancel" class="dtm-btn-secondary">
+        <i class="fas fa-times"></i> Cancel
+      </button>
+    </div>
+
+  </form>
+</div>
