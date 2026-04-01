@@ -656,7 +656,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       dropTarget.addEventListener("click", ev => {
         const row = dropTarget.closest("[data-result-id]");
         if (!row) return;
-        this._openDocumentPicker(row.dataset.resultId, dropTarget);
+        // Snapshot the rect now — element is definitely in the DOM during a click
+        const anchorRect = dropTarget.getBoundingClientRect();
+        this._openDocumentPicker(row.dataset.resultId, anchorRect);
       });
     });
 
@@ -750,8 +752,8 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
    * @param {string} resultId
    * @param {HTMLElement} anchor  - the .dtm-drop-target element to anchor the popup to
    */
-  async _openDocumentPicker(resultId, anchor, initialQuery = "") {
-    const selection = await DocumentPickerPopup.open(anchor, initialQuery);
+  async _openDocumentPicker(resultId, anchorRect, initialQuery = "") {
+    const selection = await DocumentPickerPopup.open(anchorRect, initialQuery);
     if (!selection) return;
 
     const beforeState = this._getTableState();
@@ -810,6 +812,19 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
     } else if (field === "type") {
       const newType = target.value;
+
+      // Snapshot rect and name NOW — before any await. The database call below
+      // fires Foundry update hooks which trigger a re-render that detaches DOM
+      // elements, making any later getBoundingClientRect() call return zeros.
+      const isDocument = newType === CONST.TABLE_RESULT_TYPES.DOCUMENT;
+      const anchorEl = isDocument
+        ? (target.closest("[data-result-id]")?.querySelector(".dtm-col-content") ?? target)
+        : null;
+      const anchorRect = anchorEl?.getBoundingClientRect() ?? null;
+      const existingName = isDocument
+        ? (this.table.results.get(resultId)?.name?.trim() ?? "")
+        : "";
+
       const beforeState = this._getTableState();
       await this.table.updateEmbeddedDocuments("TableResult", [{
         _id: resultId,
@@ -819,14 +834,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       const afterState = this._getTableState();
       this.undoManager.record({ type: "editRowType", before: beforeState, after: afterState });
 
-      if (newType === CONST.TABLE_RESULT_TYPES.DOCUMENT) {
-        // Anchor to the current content cell — still in the DOM before render fires.
-        // _reposition() grabs the bounding rect synchronously, so the async re-render
-        // replacing the DOM does not affect picker placement.
-        const anchor = target.closest("[data-result-id]")?.querySelector(".dtm-col-content") ?? target;
-        const existingName = this.table.results.get(resultId)?.name?.trim() ?? "";
+      if (isDocument) {
         this.render();
-        this._openDocumentPicker(resultId, anchor, existingName);
+        this._openDocumentPicker(resultId, anchorRect, existingName);
       } else {
         this.render();
       }

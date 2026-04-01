@@ -17,22 +17,26 @@ export class DocumentPickerPopup {
   static _current = null;
 
   /**
-   * Open a picker anchored to the given element.
-   * Resolves with { name, img, uuid } on selection, or null on cancel.
-   * @param {HTMLElement} anchor
+   * Open a picker positioned relative to a pre-captured DOMRect snapshot.
+   * Callers must snapshot getBoundingClientRect() themselves before any async
+   * operations, because Foundry update hooks can trigger re-renders that detach
+   * anchor elements — making a live element reference return all-zero rects.
+   *
+   * @param {DOMRect|{top,bottom,left,right}} anchorRect  - viewport rect snapshot
+   * @param {string} [initialQuery]
    * @returns {Promise<{name:string, img:string|null, uuid:string}|null>}
    */
-  static open(anchor, initialQuery = "") {
+  static open(anchorRect, initialQuery = "") {
     if (this._current) this._current._close(null);
     return new Promise(resolve => {
-      const popup = new DocumentPickerPopup(anchor, resolve, initialQuery);
+      const popup = new DocumentPickerPopup(anchorRect, resolve, initialQuery);
       this._current = popup;
       popup._mount();
     });
   }
 
-  constructor(anchor, resolve, initialQuery = "") {
-    this.anchor = anchor;
+  constructor(anchorRect, resolve, initialQuery = "") {
+    this._anchorRect = anchorRect;
     this._resolve = resolve;
     this._initialQuery = initialQuery;
     this._el = null;
@@ -76,14 +80,14 @@ export class DocumentPickerPopup {
 
     // Close when clicking outside (deferred so this click doesn't immediately close)
     this._clickAway = ev => {
-      if (!el.contains(ev.target) && ev.target !== this.anchor) this._close(null);
+      if (!el.contains(ev.target)) this._close(null);
     };
     setTimeout(() => document.addEventListener("mousedown", this._clickAway), 0);
   }
 
   _reposition() {
     const el = this._el;
-    const rect = this.anchor.getBoundingClientRect();
+    const rect = this._anchorRect;
     const W = 300;
     const vh = window.innerHeight;
 
