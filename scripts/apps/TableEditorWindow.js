@@ -69,7 +69,8 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       toggleLink: TableEditorWindow.#onToggleLink,
       linkAll: TableEditorWindow.#onLinkAll,
       autoFormula:  TableEditorWindow.#onAutoFormula,
-      detectLinks:  TableEditorWindow.#onDetectLinks
+      detectLinks:  TableEditorWindow.#onDetectLinks,
+      changeAllTypes: TableEditorWindow.#onChangeAllTypes
     }
   };
 
@@ -441,16 +442,13 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     }
 
     const content = `
-      <div style="padding:8px; display:flex; flex-direction:column; gap:8px;">
-        <label style="font-size:11px; font-weight:bold; text-transform:uppercase;
-                      letter-spacing:.5px; color:#999;">Search Source</label>
-        <select name="source" style="width:100%; height:30px; border:1px solid #555;
-                                     border-radius:3px; padding:2px 6px; font-size:13px;
-                                     background:rgba(0,0,0,.15); color:#eee;">
+      <div class="dtm-detect-links-source">
+        <label class="dtm-field-label">Search Source</label>
+        <select name="source" class="dtm-source-select">
           ${packOptions ? `<optgroup label="Compendium Packs">${packOptions}</optgroup>` : ""}
           ${folderOptions ? `<optgroup label="World Folders">${folderOptions}</optgroup>` : ""}
         </select>
-        <p style="font-size:11px; color:#888; margin:0;">Sub-folders are included automatically.</p>
+        <p class="dtm-source-hint">Sub-folders are included automatically.</p>
       </div>`;
 
     const sourceValue = await foundry.applications.api.DialogV2.wait({
@@ -508,6 +506,69 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     // ── Phase 4: Open results dialog ──────────────────────────────────────
     new DetectLinksDialog({ table: this.table, matchResults, sourceEntries, editorWindow: this }).render(true);
   }
+
+  /**
+   * Change the type of every row to Text or Document.
+   * If any rows have content, asks whether to keep or discard it first.
+   */
+  static async #onChangeAllTypes(ev, btn) {
+    const chosen = await this._showTypeMenu(btn);
+    if (!chosen) return;
+
+    const newType = chosen === "text"
+      ? CONST.TABLE_RESULT_TYPES.TEXT
+      : CONST.TABLE_RESULT_TYPES.DOCUMENT;
+
+    const results = this.table.results.contents;
+
+    // Rows that have content AND would actually change type (already-matching rows are never touched)
+    const filledRows = results.filter(r => r.type !== newType && !!(r.name?.trim() || r.documentUuid));
+
+    let keepContent = true;
+    if (filledRows.length > 0) {
+      const typeLabel = chosen === "text" ? "Text" : "Document";
+      const action = await foundry.applications.api.DialogV2.wait({
+        window: { title: "Change All Types" },
+        content: `<p>Change all ${results.length} row(s) to <strong>${typeLabel}</strong>?</p>
+                  <p>${filledRows.length} row(s) have existing content.</p>`,
+        rejectClose: false,
+        buttons: [
+          { action: "keep",    label: "Keep Content",  icon: "fas fa-check", default: true },
+          { action: "discard", label: "Clear Content",  icon: "fas fa-trash" },
+          { action: "cancel",  label: "Cancel",         icon: "fas fa-times" }
+        ]
+      });
+      if (!action || action === "cancel") return;
+      keepContent = action === "keep";
+    }
+
+    const updates = results.flatMap(r => {
+      // Already the target type — never touch it
+      if (r.type === newType) return [];
+
+      const hasContent = !!(r.name?.trim() || r.documentUuid);
+
+      // Different type but has content and user chose to keep — leave unchanged
+      if (keepContent && hasContent) return [];
+
+      const update = { _id: r.id, type: newType };
+      if (!keepContent) {
+        update.name = "";
+        update.img = null;
+        update.documentUuid = "";
+      } else if (newType === CONST.TABLE_RESULT_TYPES.TEXT) {
+        update.documentUuid = "";
+      }
+      return [update];
+    });
+
+    const beforeState = this._getTableState();
+    await this.table.updateEmbeddedDocuments("TableResult", updates);
+    const afterState = this._getTableState();
+    this.undoManager.record({ type: "changeAllTypes", before: beforeState, after: afterState });
+    this.render();
+  }
+
 
   static async #onToggleLink(event, target) {
     const row = target.closest("[data-result-id]");
@@ -599,6 +660,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       });
     });
 
+
     // Drag-and-drop: full row-list handling
     this._dragState = null;
     const rowList = html.querySelector(".dtm-row-list");
@@ -642,12 +704,54 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
   }
 
   /**
+   * Show a tiny floating menu with Text / Document options.
+   * Resolves with "text", "document", or null if dismissed.
+   * @param {HTMLElement} anchor
+   * @returns {Promise<string|null>}
+   */
+  _showTypeMenu(anchor) {
+    return new Promise(resolve => {
+      const menu = document.createElement("div");
+      menu.className = "dtm-type-menu";
+      menu.innerHTML = `
+        <div class="dtm-type-menu-item" data-value="text"><i class="fas fa-font"></i> Text</div>
+        <div class="dtm-type-menu-item" data-value="document"><i class="fas fa-file"></i> Document</div>
+      `;
+
+      document.body.appendChild(menu);
+      const rect = anchor.getBoundingClientRect();
+      const menuW = 130;
+      let left = rect.left;
+      if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
+      Object.assign(menu.style, {
+        position: "fixed",
+        top: `${rect.bottom + 2}px`,
+        left: `${left}px`,
+        zIndex: "9999"
+      });
+
+      const close = value => {
+        menu.remove();
+        document.removeEventListener("mousedown", onOutside);
+        resolve(value ?? null);
+      };
+
+      menu.querySelectorAll(".dtm-type-menu-item").forEach(item => {
+        item.addEventListener("click", () => close(item.dataset.value));
+      });
+
+      const onOutside = ev => { if (!menu.contains(ev.target)) close(null); };
+      setTimeout(() => document.addEventListener("mousedown", onOutside), 0);
+    });
+  }
+
+  /**
    * Open the document picker popup for a Document-type result row.
    * @param {string} resultId
    * @param {HTMLElement} anchor  - the .dtm-drop-target element to anchor the popup to
    */
-  async _openDocumentPicker(resultId, anchor) {
-    const selection = await DocumentPickerPopup.open(anchor);
+  async _openDocumentPicker(resultId, anchor, initialQuery = "") {
+    const selection = await DocumentPickerPopup.open(anchor, initialQuery);
     if (!selection) return;
 
     const beforeState = this._getTableState();
@@ -714,7 +818,18 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       }]);
       const afterState = this._getTableState();
       this.undoManager.record({ type: "editRowType", before: beforeState, after: afterState });
-      this.render();
+
+      if (newType === CONST.TABLE_RESULT_TYPES.DOCUMENT) {
+        // Anchor to the current content cell — still in the DOM before render fires.
+        // _reposition() grabs the bounding rect synchronously, so the async re-render
+        // replacing the DOM does not affect picker placement.
+        const anchor = target.closest("[data-result-id]")?.querySelector(".dtm-col-content") ?? target;
+        const existingName = this.table.results.get(resultId)?.name?.trim() ?? "";
+        this.render();
+        this._openDocumentPicker(resultId, anchor, existingName);
+      } else {
+        this.render();
+      }
     }
   }
 

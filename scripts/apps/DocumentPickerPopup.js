@@ -22,18 +22,19 @@ export class DocumentPickerPopup {
    * @param {HTMLElement} anchor
    * @returns {Promise<{name:string, img:string|null, uuid:string}|null>}
    */
-  static open(anchor) {
+  static open(anchor, initialQuery = "") {
     if (this._current) this._current._close(null);
     return new Promise(resolve => {
-      const popup = new DocumentPickerPopup(anchor, resolve);
+      const popup = new DocumentPickerPopup(anchor, resolve, initialQuery);
       this._current = popup;
       popup._mount();
     });
   }
 
-  constructor(anchor, resolve) {
+  constructor(anchor, resolve, initialQuery = "") {
     this.anchor = anchor;
     this._resolve = resolve;
+    this._initialQuery = initialQuery;
     this._el = null;
     this._results = [];
     this._highlighted = -1;
@@ -64,6 +65,13 @@ export class DocumentPickerPopup {
     const input = el.querySelector(".dtm-doc-picker-input");
     input.addEventListener("input", () => this._scheduleSearch(input.value));
     input.addEventListener("keydown", ev => this._onKeyDown(ev));
+
+    if (this._initialQuery) {
+      input.value = this._initialQuery;
+      input.select();
+      this._scheduleSearch(this._initialQuery);
+    }
+
     input.focus();
 
     // Close when clicking outside (deferred so this click doesn't immediately close)
@@ -204,7 +212,8 @@ export class DocumentPickerPopup {
     for (const [collection, docType] of [
       [game.actors,  "Actor"],
       [game.items,   "Item"],
-      [game.journal, "JournalEntry"]
+      [game.journal, "JournalEntry"],
+      [game.tables,  "RollTable"]
     ]) {
       for (const doc of collection.contents) {
         if (doc.name.toLowerCase().includes(lc)) {

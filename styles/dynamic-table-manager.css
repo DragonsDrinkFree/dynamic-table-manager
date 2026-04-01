@@ -226,6 +226,69 @@ button.dtm-create-table {
   background: rgba(100, 160, 255, 0.9);
 }
 
+/* Type header cell — stacks label and change-all button */
+.dtm-col-type-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+.dtm-type-all-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--color-text-light-tertiary, #888);
+  cursor: pointer;
+  padding: 1px 4px;
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.dtm-type-all-btn:hover {
+  opacity: 1;
+  color: var(--color-text-light-primary, #eee);
+  border-color: var(--color-border-light-tertiary, #555);
+}
+
+/* Floating mini menu for type selection */
+.dtm-type-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--color-bg-primary, #1c1c2e);
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 5px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  padding: 3px 0;
+  min-width: 120px;
+  overflow: hidden;
+}
+
+.dtm-type-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  color: var(--color-text-light-primary, #eee);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.dtm-type-menu-item:hover {
+  background: rgba(100, 160, 255, 0.14);
+}
+
+.dtm-type-menu-item i {
+  width: 14px;
+  text-align: center;
+  color: var(--color-text-light-tertiary, #888);
+  font-size: 11px;
+}
+
 /* Column widths — Range and Type are fixed/small, Content gets remaining space */
 .dtm-col-range {
   flex: 0 0 60px;
@@ -1361,6 +1424,48 @@ input.dtm-col-range:disabled {
   padding: 8px;
   border-top: 1px solid var(--color-border-light-tertiary, #444);
   flex-shrink: 0;
+}
+
+/* ============================================
+   Detect Links — Source Picker Dialog
+   ============================================ */
+
+.dtm-detect-links-source {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+
+.dtm-field-label {
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-light-tertiary, #999);
+}
+
+.dtm-source-select {
+  width: 100%;
+  height: 30px;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 13px;
+  background: var(--color-bg-option, rgba(0, 0, 0, 0.3));
+  color: var(--color-text-light-primary, #eee);
+}
+
+.dtm-source-select optgroup,
+.dtm-source-select option {
+  background: #1a1a2e;
+  color: #ddd;
+}
+
+.dtm-source-hint {
+  font-size: 11px;
+  color: var(--color-text-light-tertiary, #888);
+  margin: 0;
 }
 
 /* ============================================
