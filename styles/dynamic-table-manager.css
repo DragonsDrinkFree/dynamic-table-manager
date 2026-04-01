@@ -191,6 +191,39 @@ button.dtm-create-table {
   border: 1px solid transparent;
   border-radius: 3px;
   transition: background-color 0.15s;
+  position: relative;
+}
+
+/* Grouped-row vertical line — drawn in the link-button column.
+   left: 19px = 8px row padding + 24px col-link / 2 − 1px to centre the 2px line.
+   top/bottom extend ±2px to bridge the 2px gap between flex rows,
+   making the line appear continuous across the whole group. */
+.dtm-row.dtm-group-start::before,
+.dtm-row.dtm-group-middle::before,
+.dtm-row.dtm-group-end::before {
+  content: "";
+  position: absolute;
+  left: 19px;
+  width: 2px;
+  background: rgba(100, 160, 255, 0.45);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dtm-row.dtm-group-start::before {
+  top: 50%;
+  bottom: -2px;
+}
+
+.dtm-row.dtm-group-middle::before {
+  top: -2px;
+  bottom: -2px;
+}
+
+.dtm-row.dtm-group-end::before {
+  top: -2px;
+  bottom: 50%;
 }
 
 .dtm-row:hover {
@@ -517,6 +550,17 @@ button.dtm-create-table {
 .dtm-link-btn.dtm-linked {
   color: rgba(100, 160, 255, 0.85);
   opacity: 1;
+}
+
+.dtm-link-btn.dtm-group-anchor,
+.dtm-link-btn.dtm-group-anchor:disabled {
+  color: rgba(80, 200, 120, 0.9);
+  opacity: 1;
+  cursor: default;
+}
+
+.dtm-link-btn.dtm-group-anchor:hover:not(:disabled) {
+  color: rgba(100, 230, 140, 1);
 }
 
 .dtm-link-btn:disabled {

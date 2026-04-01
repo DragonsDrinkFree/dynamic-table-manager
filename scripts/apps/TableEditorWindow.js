@@ -94,22 +94,35 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
   async _prepareContext() {
     await this._ensureRowOrder();
     const sortedResults = this._sortedResults();
-    const mappedResults = sortedResults.map((r, i) => ({
-      id: r.id,
-      rangeLow: r.range[0],
-      rangeHigh: r.range[1],
-      rangeDisplay: r.range[0] === r.range[1] ? `${r.range[0]}` : `${r.range[0]}-${r.range[1]}`,
-      name: r.name,
-      description: r.description,
-      type: r.type,
-      isText: r.type === CONST.TABLE_RESULT_TYPES.TEXT,
-      typeLabel: this._getResultTypeLabel(r.type),
-      documentUuid: r.documentUuid,
-      img: r.img,
-      weight: r.weight,
-      drawn: r.drawn,
-      linked: i > 0 && !!r.getFlag("dynamic-table-manager", "linked")
-    }));
+    const mappedResults = sortedResults.map((r, i) => {
+      const linked     = i > 0 && !!r.getFlag("dynamic-table-manager", "linked");
+      const nextLinked = i < sortedResults.length - 1
+        && !!sortedResults[i + 1].getFlag("dynamic-table-manager", "linked");
+
+      let groupClass = "";
+      if (!linked && nextLinked)  groupClass = "dtm-group-start";
+      else if (linked && nextLinked)  groupClass = "dtm-group-middle";
+      else if (linked && !nextLinked) groupClass = "dtm-group-end";
+
+      return {
+        id: r.id,
+        rangeLow: r.range[0],
+        rangeHigh: r.range[1],
+        rangeDisplay: r.range[0] === r.range[1] ? `${r.range[0]}` : `${r.range[0]}-${r.range[1]}`,
+        name: r.name,
+        description: r.description,
+        type: r.type,
+        isText: r.type === CONST.TABLE_RESULT_TYPES.TEXT,
+        typeLabel: this._getResultTypeLabel(r.type),
+        documentUuid: r.documentUuid,
+        img: r.img,
+        weight: r.weight,
+        drawn: r.drawn,
+        linked,
+        groupClass,
+        isGroupAnchor: groupClass === "dtm-group-start"
+      };
+    });
     const linkedAll = mappedResults.length > 1 && mappedResults.slice(1).every(r => r.linked);
     return {
       table: this.table,

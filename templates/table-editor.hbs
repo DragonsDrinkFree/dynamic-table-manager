@@ -78,9 +78,9 @@
   {{!-- Row List --}}
   <section class="dtm-row-list">
     {{#each results}}
-    <div class="dtm-row" data-result-id="{{this.id}}">
-      <button type="button" class="dtm-col-link dtm-link-btn{{#if this.linked}} dtm-linked{{/if}}" data-action="toggleLink" title="{{#if this.linked}}Unlink row{{else}}Link to row above{{/if}}" {{#if @first}}disabled{{/if}}>
-        <i class="fas fa-link"></i>
+    <div class="dtm-row{{#if this.groupClass}} {{this.groupClass}}{{/if}}" data-result-id="{{this.id}}">
+      <button type="button" class="dtm-col-link dtm-link-btn{{#if this.linked}} dtm-linked{{/if}}{{#if this.isGroupAnchor}} dtm-group-anchor{{/if}}" data-action="toggleLink" title="{{#if this.isGroupAnchor}}Anchor row — linked rows below share this range{{else if this.linked}}Unlink row{{else}}Link to row above{{/if}}" {{#if @first}}disabled{{/if}}>
+        {{#if this.isGroupAnchor}}<i class="fas fa-anchor"></i>{{else}}<i class="fas fa-link"></i>{{/if}}
       </button>
       <input class="dtm-col-range" type="text" data-field="range" value="{{this.rangeDisplay}}" {{#if this.linked}}disabled{{/if}} title="Single number or range (e.g. 5 or 3-8)" />
 
