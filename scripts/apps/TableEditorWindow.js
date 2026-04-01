@@ -3,6 +3,7 @@ import { UndoManager } from "../lib/UndoManager.js";
 import { TableSync } from "../lib/TableSync.js";
 import { LinkMatcher } from "../lib/LinkMatcher.js";
 import { DetectLinksDialog } from "./DetectLinksDialog.js";
+import { DocumentPickerPopup } from "./DocumentPickerPopup.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -589,6 +590,15 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       }
     });
 
+    // Document picker: clicking the drop-target on Document-type rows
+    html.querySelectorAll(".dtm-drop-target").forEach(dropTarget => {
+      dropTarget.addEventListener("click", ev => {
+        const row = dropTarget.closest("[data-result-id]");
+        if (!row) return;
+        this._openDocumentPicker(row.dataset.resultId, dropTarget);
+      });
+    });
+
     // Drag-and-drop: full row-list handling
     this._dragState = null;
     const rowList = html.querySelector(".dtm-row-list");
@@ -629,6 +639,28 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
         }
       });
     }
+  }
+
+  /**
+   * Open the document picker popup for a Document-type result row.
+   * @param {string} resultId
+   * @param {HTMLElement} anchor  - the .dtm-drop-target element to anchor the popup to
+   */
+  async _openDocumentPicker(resultId, anchor) {
+    const selection = await DocumentPickerPopup.open(anchor);
+    if (!selection) return;
+
+    const beforeState = this._getTableState();
+    await this.table.updateEmbeddedDocuments("TableResult", [{
+      _id: resultId,
+      type: CONST.TABLE_RESULT_TYPES.DOCUMENT,
+      documentUuid: selection.uuid,
+      name: selection.name,
+      img: selection.img ?? null
+    }]);
+    const afterState = this._getTableState();
+    this.undoManager.record({ type: "editRowPicker", before: beforeState, after: afterState });
+    this.render();
   }
 
   /**
@@ -703,7 +735,16 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
   /**
    * Tab within a column (Range or Content) instead of across columns.
-   * Shift+Tab moves to the previous row in the same column.
+   *
+   * Range column  — Tab/Shift+Tab jumps to the same column in the next/prev row.
+   *
+   * Content column — Tab cycles through a flat sequence of all focusable content
+   *   items across every row in visual order:
+   *     [desc-btn(row0), name-input(row0), desc-btn(row1), name-input(row1), …]
+   *   One Tab steps forward, one Shift+Tab steps backward.  A "double tab" from
+   *   the last item in a row (name-input) naturally lands on the desc-btn of the
+   *   next row, matching the requested "double-tab to advance a row" feel.
+   *   Document-type rows have no name-input, so they contribute only their btn.
    */
   _onColumnTab(ev) {
     const target = ev.target;
@@ -711,27 +752,46 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const currentRow = target.closest(".dtm-row");
     if (!currentRow) return;
 
-    const idx = rows.indexOf(currentRow);
     const step = ev.shiftKey ? -1 : 1;
 
-    let selector = null;
+    // ── Range column ──────────────────────────────────────────────────────────
     if (target.matches("input.dtm-col-range")) {
-      selector = "input.dtm-col-range";
-    } else if (target.matches(".dtm-col-content input[data-field='name']")) {
-      selector = ".dtm-col-content input[data-field='name']";
-    }
-    if (!selector) return;
-
-    // Walk in direction, skipping disabled inputs
-    for (let i = idx + step; i >= 0 && i < rows.length; i += step) {
-      const next = rows[i].querySelector(selector);
-      if (next && !next.disabled) {
-        ev.preventDefault();
-        next.focus();
-        next.select();
-        return;
+      const idx = rows.indexOf(currentRow);
+      for (let i = idx + step; i >= 0 && i < rows.length; i += step) {
+        const next = rows[i].querySelector("input.dtm-col-range");
+        if (next && !next.disabled) {
+          ev.preventDefault();
+          next.focus();
+          next.select();
+          return;
+        }
       }
+      return;
     }
+
+    // ── Content column ────────────────────────────────────────────────────────
+    const isDescBtn   = target.matches(".dtm-col-content .dtm-desc-btn");
+    const isNameInput = target.matches(".dtm-col-content input[data-field='name']");
+    if (!isDescBtn && !isNameInput) return;
+
+    // Build flat ordered list: [btn, input?] per row, skipping disabled elements
+    const focusables = [];
+    for (const row of rows) {
+      const btn   = row.querySelector(".dtm-col-content .dtm-desc-btn");
+      const input = row.querySelector(".dtm-col-content input[data-field='name']");
+      if (btn   && !btn.disabled)   focusables.push(btn);
+      if (input && !input.disabled) focusables.push(input);
+    }
+
+    const cur = focusables.indexOf(target);
+    if (cur === -1) return;
+
+    const next = focusables[cur + step];
+    if (!next) return;
+
+    ev.preventDefault();
+    next.focus();
+    if (next.tagName === "INPUT") next.select();
   }
 
   /**

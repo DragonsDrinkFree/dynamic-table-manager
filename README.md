@@ -1,6 +1,6 @@
 # Install
-Copy this file into your add-on module installer's manifest path
-https://github.com/DragonsDrinkFree/dynamic-table-manager/releases/latest/download/module.json
+
+Install Manifest: https://github.com/DragonsDrinkFree/dynamic-table-manager/releases/latest/download/module.json
 # Overview
 
 ## User Guide

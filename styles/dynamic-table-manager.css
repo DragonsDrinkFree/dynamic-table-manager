@@ -1362,3 +1362,124 @@ input.dtm-col-range:disabled {
   border-top: 1px solid var(--color-border-light-tertiary, #444);
   flex-shrink: 0;
 }
+
+/* ============================================
+   Document Picker Popup
+   ============================================ */
+
+.dtm-doc-picker {
+  position: fixed;
+  z-index: 9999;
+  width: 300px;
+  max-height: 320px;
+  background: var(--color-bg-primary, #1c1c2e);
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dtm-doc-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #444);
+  flex-shrink: 0;
+}
+
+.dtm-doc-picker-search > i {
+  color: var(--color-text-light-tertiary, #888);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.dtm-doc-picker-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--color-text-light-primary, #eee);
+  font-size: 13px;
+  padding: 0;
+  min-width: 0;
+}
+
+.dtm-doc-picker-input::placeholder {
+  color: var(--color-text-light-tertiary, #666);
+  font-size: 11px;
+}
+
+.dtm-doc-picker-hint {
+  padding: 12px;
+  font-size: 12px;
+  color: var(--color-text-light-tertiary, #777);
+  font-style: italic;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.dtm-doc-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.dtm-doc-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-text-light-primary, #eee);
+  transition: background 0.1s;
+  min-width: 0;
+}
+
+.dtm-doc-picker-item:hover,
+.dtm-doc-picker-item.dtm-highlighted {
+  background: rgba(100, 160, 255, 0.14);
+}
+
+.dtm-doc-img {
+  width: 20px;
+  height: 20px;
+  border-radius: 2px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.dtm-doc-icon {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  color: var(--color-text-light-tertiary, #888);
+  font-size: 11px;
+}
+
+.dtm-doc-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.dtm-doc-tag {
+  font-size: 10px;
+  color: var(--color-text-light-tertiary, #777);
+  flex-shrink: 0;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
