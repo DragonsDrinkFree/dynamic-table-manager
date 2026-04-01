@@ -1,6 +1,8 @@
 import { DiceFormulaParser } from "../lib/DiceFormulaParser.js";
 import { UndoManager } from "../lib/UndoManager.js";
 import { TableSync } from "../lib/TableSync.js";
+import { LinkMatcher } from "../lib/LinkMatcher.js";
+import { DetectLinksDialog } from "./DetectLinksDialog.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -65,7 +67,8 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       revertSnapshot: TableEditorWindow.#onRevertSnapshot,
       toggleLink: TableEditorWindow.#onToggleLink,
       linkAll: TableEditorWindow.#onLinkAll,
-      autoFormula: TableEditorWindow.#onAutoFormula
+      autoFormula:  TableEditorWindow.#onAutoFormula,
+      detectLinks:  TableEditorWindow.#onDetectLinks
     }
   };
 
@@ -416,6 +419,95 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     this.render();
   }
 
+  static async #onDetectLinks() {
+    // ── Phase 1: Source picker ────────────────────────────────────────────
+    const validTypes = new Set(["Actor", "Item", "JournalEntry"]);
+    const packs = game.packs.contents.filter(p => validTypes.has(p.metadata.type));
+    const worldFolders = game.folders.contents.filter(
+      f => validTypes.has(f.type) && !f.folder  // top-level only in picker
+    );
+
+    const packOptions = packs.map(p =>
+      `<option value="pack:${p.collection}">${p.metadata.label} (${p.metadata.type})</option>`
+    ).join("");
+    const folderOptions = worldFolders.map(f =>
+      `<option value="folder:${f.id}">${f.name} [${f.type}]</option>`
+    ).join("");
+
+    if (!packOptions && !folderOptions) {
+      ui.notifications.warn("No valid compendium packs or world folders found.");
+      return;
+    }
+
+    const content = `
+      <div style="padding:8px; display:flex; flex-direction:column; gap:8px;">
+        <label style="font-size:11px; font-weight:bold; text-transform:uppercase;
+                      letter-spacing:.5px; color:#999;">Search Source</label>
+        <select name="source" style="width:100%; height:30px; border:1px solid #555;
+                                     border-radius:3px; padding:2px 6px; font-size:13px;
+                                     background:rgba(0,0,0,.15); color:#eee;">
+          ${packOptions ? `<optgroup label="Compendium Packs">${packOptions}</optgroup>` : ""}
+          ${folderOptions ? `<optgroup label="World Folders">${folderOptions}</optgroup>` : ""}
+        </select>
+        <p style="font-size:11px; color:#888; margin:0;">Sub-folders are included automatically.</p>
+      </div>`;
+
+    const sourceValue = await foundry.applications.api.DialogV2.wait({
+      window: { title: "Detect Links — Choose Source" },
+      content,
+      rejectClose: false,
+      buttons: [
+        {
+          action: "pick",
+          label: "Search",
+          icon: "fas fa-search",
+          default: true,
+          callback: (_ev, _btn, dialog) =>
+            dialog.element.querySelector("[name='source']")?.value ?? null
+        },
+        { action: "cancel", label: "Cancel", icon: "fas fa-times" }
+      ]
+    });
+
+    if (!sourceValue || sourceValue === "cancel") return;
+
+    // ── Phase 2: Load source entries ──────────────────────────────────────
+    let sourceEntries;
+    if (sourceValue.startsWith("pack:")) {
+      const pack = game.packs.get(sourceValue.slice(5));
+      if (!pack) { ui.notifications.error("Pack not found."); return; }
+      ui.notifications.info("Detect Links: loading index…");
+      sourceEntries = await LinkMatcher.entriesFromPack(pack);
+    } else {
+      const folder = game.folders.get(sourceValue.slice(7));
+      if (!folder) { ui.notifications.error("Folder not found."); return; }
+      sourceEntries = LinkMatcher.entriesFromFolder(folder);
+    }
+
+    if (!sourceEntries.length) {
+      ui.notifications.warn("Detect Links: source has no documents.");
+      return;
+    }
+
+    // ── Phase 3: Run matching ─────────────────────────────────────────────
+    const textResults = this.table.results.contents.filter(
+      r => r.type === CONST.TABLE_RESULT_TYPES.TEXT
+    );
+    if (!textResults.length) {
+      ui.notifications.warn("Detect Links: table has no Text-type results.");
+      return;
+    }
+
+    const matchResults = LinkMatcher.match(textResults, sourceEntries);
+    if (!matchResults.length) {
+      ui.notifications.info("Detect Links: no matches found.");
+      return;
+    }
+
+    // ── Phase 4: Open results dialog ──────────────────────────────────────
+    new DetectLinksDialog({ table: this.table, matchResults, sourceEntries, editorWindow: this }).render(true);
+  }
+
   static async #onToggleLink(event, target) {
     const row = target.closest("[data-result-id]");
     const resultId = row?.dataset.resultId;
@@ -595,7 +687,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
   }
 
   /**
-   * Keyboard shortcut handler for undo/redo.
+   * Keyboard shortcut handler for undo/redo and column-aware Tab navigation.
    */
   _onKeyDown(ev) {
     if (ev.ctrlKey && ev.key === "z" && !ev.shiftKey) {
@@ -604,6 +696,41 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     } else if ((ev.ctrlKey && ev.key === "y") || (ev.ctrlKey && ev.shiftKey && ev.key === "z")) {
       ev.preventDefault();
       TableEditorWindow.#onRedo.call(this);
+    } else if (ev.key === "Tab") {
+      this._onColumnTab(ev);
+    }
+  }
+
+  /**
+   * Tab within a column (Range or Content) instead of across columns.
+   * Shift+Tab moves to the previous row in the same column.
+   */
+  _onColumnTab(ev) {
+    const target = ev.target;
+    const rows = [...this.element.querySelectorAll(".dtm-row-list .dtm-row")];
+    const currentRow = target.closest(".dtm-row");
+    if (!currentRow) return;
+
+    const idx = rows.indexOf(currentRow);
+    const step = ev.shiftKey ? -1 : 1;
+
+    let selector = null;
+    if (target.matches("input.dtm-col-range")) {
+      selector = "input.dtm-col-range";
+    } else if (target.matches(".dtm-col-content input[data-field='name']")) {
+      selector = ".dtm-col-content input[data-field='name']";
+    }
+    if (!selector) return;
+
+    // Walk in direction, skipping disabled inputs
+    for (let i = idx + step; i >= 0 && i < rows.length; i += step) {
+      const next = rows[i].querySelector(selector);
+      if (next && !next.disabled) {
+        ev.preventDefault();
+        next.focus();
+        next.select();
+        return;
+      }
     }
   }
 

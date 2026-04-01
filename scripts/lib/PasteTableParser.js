@@ -16,8 +16,8 @@
  */
 export class PasteTableParser {
 
-  /** Matches a standalone range or single number: "1", "3-8", "11", "-2" */
-  static NUMBER_LINE = /^(-?\d+)\s*[-–]\s*(-?\d+)$|^(-?\d+)$/;
+  /** Matches a standalone range or single number: "1", "3-8", "11-20", "01–10" */
+  static NUMBER_LINE = /^(-?\d+)\s*[-–—]\s*(-?\d+)$|^(-?\d+)$/;
 
   /** Matches dice notation: d6, 2d10, d100+5 */
   static DICE_LINE = /^\s*-?\d*[dD]\d+([+-]\d+)?\s*$/;

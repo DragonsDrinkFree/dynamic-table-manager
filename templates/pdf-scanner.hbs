@@ -1,0 +1,125 @@
+{{!-- PDF Scanner Window --}}
+<div class="dtm-scanner-container">
+
+  {{!-- LEFT: PDF viewer --}}
+  <div class="dtm-scanner-left">
+    <div class="dtm-scanner-toolbar">
+      <button type="button" data-action="selectPdf" class="dtm-btn-secondary">
+        <i class="fas fa-folder-open"></i> Select PDF
+      </button>
+      <button type="button" data-action="toggleSelect"
+              class="dtm-btn-secondary{{#if selectMode}} dtm-active{{/if}}"
+              {{#unless hasPdf}}disabled{{/unless}}>
+        <i class="fas fa-vector-square"></i> Select Tables
+      </button>
+      {{#if hasPdf}}
+      <div class="dtm-page-nav">
+        <button type="button" data-action="prevPage" {{#if isFirstPage}}disabled{{/if}}>
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <input type="number" class="dtm-page-input" value="{{currentPage}}" min="1" max="{{totalPages}}" title="Go to page">
+        <span class="dtm-page-total">/ {{totalPages}}</span>
+        <button type="button" data-action="nextPage" {{#if isLastPage}}disabled{{/if}}>
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+      {{/if}}
+    </div>
+
+    <input type="file" id="dtm-pdf-file-input" accept=".pdf" style="display:none">
+
+    <div class="dtm-canvas-wrapper">
+      {{#unless hasPdf}}
+      <div class="dtm-pdf-empty">
+        <i class="fas fa-file-pdf"></i>
+        <p>Click <strong>Select PDF</strong> to open a file.</p>
+        <p class="dtm-pdf-empty-hint">Then use <strong>Select Tables</strong> to draw regions over table content.</p>
+      </div>
+      {{/unless}}
+      <canvas id="dtm-pdf-canvas"></canvas>
+      <canvas id="dtm-select-canvas"></canvas>
+    </div>
+  </div>
+
+  {{!-- RIGHT: Regions + Preview + Footer --}}
+  <div class="dtm-scanner-right">
+
+    <div class="dtm-region-list-header">
+      <span>Tables</span>
+      <span class="dtm-badge">{{regions.length}}</span>
+    </div>
+
+    <div class="dtm-region-list">
+      {{#each regions}}
+      <div class="dtm-region-item{{#if this.isActive}} dtm-region-active{{/if}}"
+           data-region-id="{{this.id}}">
+        <input type="text" class="dtm-region-name" value="{{this.name}}" placeholder="Table name">
+        <span class="dtm-badge dtm-page-badge">p.{{this.page}}</span>
+        <span class="dtm-badge">{{this.entryCount}} rows</span>
+        <button type="button" data-action="previewRegion" title="Preview / hide preview">
+          <i class="fas fa-eye"></i>
+        </button>
+        <button type="button" data-action="deleteRegion" title="Delete region">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+      {{/each}}
+      {{#unless regions.length}}
+      <div class="dtm-region-empty">
+        Draw selection boxes over table regions in the PDF to add them here.
+      </div>
+      {{/unless}}
+    </div>
+
+    {{#if activeRegion}}
+    <div class="dtm-preview-panel">
+      <div class="dtm-preview-header">
+        <span class="dtm-preview-title">{{activeRegion.name}}</span>
+        {{#if activeRegion.isMultiColumn}}
+        <span class="dtm-badge">{{activeRegion.columns.length}} columns</span>
+        {{/if}}
+      </div>
+      {{#if activeRegion.isMultiColumn}}
+        {{#each activeRegion.columns}}
+        <div class="dtm-preview-col-block">
+          <div class="dtm-preview-col-header">{{this.header}}</div>
+          {{#each this.entries}}
+          <div class="dtm-preview-row">
+            <span class="dtm-preview-range">{{this.low}}</span>
+            <span class="dtm-preview-name">{{this.name}}</span>
+          </div>
+          {{/each}}
+        </div>
+        {{/each}}
+      {{else}}
+        {{#each activeRegion.entries}}
+        <div class="dtm-preview-row">
+          <span class="dtm-preview-range">{{this.low}}</span>
+          <span class="dtm-preview-name">{{this.name}}</span>
+        </div>
+        {{/each}}
+        {{#unless activeRegion.entries.length}}
+        <div class="dtm-region-empty">No data extracted — try a larger region.</div>
+        {{/unless}}
+      {{/if}}
+    </div>
+    {{/if}}
+
+    <div class="dtm-scanner-footer">
+      <div class="dtm-field-group">
+        <label>Base Table Name</label>
+        <input type="text" name="baseName" value="{{suggestedName}}" placeholder="PDF Table">
+      </div>
+      <div class="dtm-dialog-buttons">
+        <button type="button" data-action="createTables" class="dtm-btn-primary"
+                {{#unless hasRegions}}disabled{{/unless}}>
+          <i class="fas fa-check"></i> Create Tables
+        </button>
+        <button type="button" data-action="cancel" class="dtm-btn-secondary">
+          <i class="fas fa-times"></i> Cancel
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>

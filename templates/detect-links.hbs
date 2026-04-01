@@ -1,0 +1,140 @@
+{{!-- Detect Links Results Dialog --}}
+<div class="dtm-detect-links-container">
+
+  {{!-- Summary / bulk action bar --}}
+  <div class="dtm-dl-summary">
+    <span class="dtm-dl-summary-text">{{acceptedCount}} / {{totalCount}} rows accepted</span>
+    {{#if hasPending}}
+    <div class="dtm-dl-bulk-btns">
+      {{#if pendingPerfect}}
+      <button type="button" class="dtm-dl-bulk dtm-dl-bulk-perfect"
+              data-action="bulkAccept" data-tier="perfect">
+        <i class="fas fa-check-double"></i> Link: Perfect ({{pendingPerfect}})
+      </button>
+      {{/if}}
+      {{#if pendingDecent}}
+      <button type="button" class="dtm-dl-bulk dtm-dl-bulk-decent"
+              data-action="bulkAccept" data-tier="decent">
+        <i class="fas fa-check-double"></i> Link: Decent ({{pendingDecent}})
+      </button>
+      {{/if}}
+      {{#if pendingLoose}}
+      <button type="button" class="dtm-dl-bulk dtm-dl-bulk-loose"
+              data-action="bulkAccept" data-tier="loose">
+        <i class="fas fa-check-double"></i> Link: Loose ({{pendingLoose}})
+      </button>
+      {{/if}}
+    </div>
+    {{/if}}
+  </div>
+
+  {{!-- Column headers --}}
+  <div class="dtm-dl-header">
+    <span class="dtm-dl-col-result">Table Result</span>
+    <span class="dtm-dl-col-match">Best Match</span>
+    <span class="dtm-dl-col-tier">Tier</span>
+    <span class="dtm-dl-col-actions"></span>
+  </div>
+
+  {{!-- Scrollable row list --}}
+  <div class="dtm-dl-rows">
+    {{#each rows}}
+    <div class="dtm-dl-row{{#if this.isAccepted}} dtm-dl-accepted{{/if}}{{#if this.isDenied}} dtm-dl-denied{{/if}}{{#if this.isPending}} dtm-dl-pending{{/if}}"
+         data-result-id="{{this.resultId}}">
+
+      {{!-- Source result name --}}
+      <div class="dtm-dl-col-result" title="{{this.resultName}}">
+        <span class="dtm-dl-result-name">{{this.resultName}}</span>
+      </div>
+
+      {{!-- Match display --}}
+      <div class="dtm-dl-col-match">
+        {{#if this.isAccepted}}
+          <button type="button" class="dtm-dl-accepted-doc" data-action="clearAccepted"
+                  title="Click to un-accept">
+            {{#if this.accepted.img}}
+            <img class="dtm-dl-doc-img" src="{{this.accepted.img}}" alt="" />
+            {{else}}
+            <i class="fas fa-file-alt"></i>
+            {{/if}}
+            <span class="dtm-dl-doc-name">{{this.accepted.name}}</span>
+          </button>
+        {{else if this.isDenied}}
+          <span class="dtm-dl-denied-label">Skipped</span>
+        {{else}}
+          {{#if this.bestCandidate}}
+          <span class="dtm-dl-suggestion" title="{{this.bestCandidate.name}}">{{this.bestCandidate.name}}</span>
+          {{/if}}
+          <div class="dtm-link-search-wrap">
+            <input type="text" class="dtm-link-search" placeholder="Search…"
+                   value="{{this.searchQuery}}" autocomplete="off" />
+            {{#if this.dropdownOpen}}
+            <div class="dtm-link-dropdown">
+              {{#each this.filteredCandidates}}
+              <div class="dtm-link-dropdown-item"
+                   data-uuid="{{this.uuid}}"
+                   data-name="{{this.name}}"
+                   data-img="{{this.img}}">
+                {{#if this.img}}<img src="{{this.img}}" alt="" class="dtm-dl-doc-img" />{{/if}}
+                <span>{{this.name}}</span>
+              </div>
+              {{else}}
+              <div class="dtm-link-dropdown-empty">No results</div>
+              {{/each}}
+            </div>
+            {{/if}}
+          </div>
+        {{/if}}
+      </div>
+
+      {{!-- Tier badge --}}
+      <div class="dtm-dl-col-tier">
+        {{#if this.isAccepted}}
+          {{#if this.accepted}}
+          <span class="dtm-dl-tier-badge dtm-dl-tier-{{this.accepted.tier}}">{{this.accepted.tier}}</span>
+          {{/if}}
+        {{else if this.isPending}}
+          {{#if this.bestCandidate}}
+          <span class="dtm-dl-tier-badge dtm-dl-tier-{{this.bestCandidate.tier}}">{{this.bestCandidate.tier}}</span>
+          {{/if}}
+        {{/if}}
+      </div>
+
+      {{!-- Per-row action buttons --}}
+      <div class="dtm-dl-col-actions">
+        {{#if this.isPending}}
+        <button type="button" class="dtm-dl-accept-btn" data-action="acceptRow" title="Accept match">
+          <i class="fas fa-check"></i>
+        </button>
+        <button type="button" class="dtm-dl-deny-btn" data-action="denyRow" title="Skip this row">
+          <i class="fas fa-times"></i>
+        </button>
+        {{/if}}
+        {{#if this.isAccepted}}
+        <button type="button" class="dtm-dl-deny-btn" data-action="denyRow" title="Revoke and skip">
+          <i class="fas fa-times"></i>
+        </button>
+        {{/if}}
+      </div>
+
+    </div>
+    {{/each}}
+
+    {{#unless rows.length}}
+    <div class="dtm-empty-state" style="padding:20px; text-align:center; color:#888;">
+      No matches found in the selected source.
+    </div>
+    {{/unless}}
+  </div>
+
+  {{!-- Footer --}}
+  <div class="dtm-dl-footer">
+    <button type="button" class="dtm-btn-secondary" data-action="cancelDialog">
+      <i class="fas fa-times"></i> Cancel
+    </button>
+    <button type="button" class="dtm-btn-primary" data-action="applyLinks">
+      <i class="fas fa-link"></i> Apply Links ({{acceptedCount}})
+    </button>
+  </div>
+
+</div>
