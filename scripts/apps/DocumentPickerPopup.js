@@ -15,6 +15,7 @@
 export class DocumentPickerPopup {
 
   static _current = null;
+  static DEFAULT_TYPES = ["Actor", "Item", "JournalEntry", "RollTable"];
 
   /**
    * Open a picker positioned relative to a pre-captured DOMRect snapshot.
@@ -26,19 +27,20 @@ export class DocumentPickerPopup {
    * @param {string} [initialQuery]
    * @returns {Promise<{name:string, img:string|null, uuid:string}|null>}
    */
-  static open(anchorRect, initialQuery = "") {
+  static open(anchorRect, initialQuery = "", typeFilter = null) {
     if (this._current) this._current._close(null);
     return new Promise(resolve => {
-      const popup = new DocumentPickerPopup(anchorRect, resolve, initialQuery);
+      const popup = new DocumentPickerPopup(anchorRect, resolve, initialQuery, typeFilter);
       this._current = popup;
       popup._mount();
     });
   }
 
-  constructor(anchorRect, resolve, initialQuery = "") {
+  constructor(anchorRect, resolve, initialQuery = "", typeFilter = null) {
     this._anchorRect = anchorRect;
     this._resolve = resolve;
     this._initialQuery = initialQuery;
+    this._typeFilter = typeFilter; // null = all types; array = restrict to listed types
     this._el = null;
     this._results = [];
     this._highlighted = -1;
@@ -78,11 +80,12 @@ export class DocumentPickerPopup {
 
     input.focus();
 
-    // Close when clicking outside (deferred so this click doesn't immediately close)
+    // Close when clicking outside (deferred so this click doesn't immediately close).
+    // Store the timer ID so _close() can cancel it if called before the timeout fires.
     this._clickAway = ev => {
       if (!el.contains(ev.target)) this._close(null);
     };
-    setTimeout(() => document.addEventListener("mousedown", this._clickAway), 0);
+    this._clickAwayTimer = setTimeout(() => document.addEventListener("mousedown", this._clickAway), 0);
   }
 
   _reposition() {
@@ -117,6 +120,7 @@ export class DocumentPickerPopup {
     if (this._dead) return;
     this._dead = true;
     this._el?.remove();
+    clearTimeout(this._clickAwayTimer);
     document.removeEventListener("mousedown", this._clickAway);
     if (DocumentPickerPopup._current === this) DocumentPickerPopup._current = null;
     this._resolve(result);
@@ -164,7 +168,7 @@ export class DocumentPickerPopup {
 
   /** Return pack-hint items whose label includes filter. */
   _listPacks(filter) {
-    const TYPES = ["Actor", "Item", "JournalEntry", "RollTable"];
+    const TYPES = this._typeFilter ?? DocumentPickerPopup.DEFAULT_TYPES;
     const lc = filter.toLowerCase();
     return [...game.packs]
       .filter(p => TYPES.includes(p.metadata.type))
@@ -179,7 +183,7 @@ export class DocumentPickerPopup {
 
   /** Search compendium entries. packFilter="" means all packs. */
   async _searchPacks(packFilter, term) {
-    const TYPES = ["Actor", "Item", "JournalEntry", "RollTable"];
+    const TYPES = this._typeFilter ?? DocumentPickerPopup.DEFAULT_TYPES;
     const lc = term.toLowerCase();
     const packLc = packFilter.toLowerCase();
 
@@ -213,12 +217,17 @@ export class DocumentPickerPopup {
     const lc = query.toLowerCase();
     const results = [];
 
-    for (const [collection, docType] of [
+    const allCollections = [
       [game.actors,  "Actor"],
       [game.items,   "Item"],
       [game.journal, "JournalEntry"],
       [game.tables,  "RollTable"]
-    ]) {
+    ];
+    const collections = this._typeFilter
+      ? allCollections.filter(([, t]) => this._typeFilter.includes(t))
+      : allCollections;
+
+    for (const [collection, docType] of collections) {
       for (const doc of collection.contents) {
         if (doc.name.toLowerCase().includes(lc)) {
           results.push({ name: doc.name, img: doc.img ?? null, uuid: doc.uuid, docType });

@@ -1632,3 +1632,240 @@ input.dtm-col-range:disabled {
   border-radius: 3px;
   padding: 1px 5px;
 }
+
+/* ============================================
+   Journal Template Editor
+   ============================================ */
+
+/* Meta row: template page + output journal side by side */
+.dtm-jt-meta-row {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.dtm-jt-meta-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dtm-jt-meta-label {
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-light-tertiary, #999);
+}
+
+.dtm-jt-meta-btn {
+  height: 28px;
+  border: 1px dashed var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  background: var(--color-bg-option, rgba(0,0,0,0.1));
+  color: var(--color-text-light-primary, #eee);
+  font-size: 12px;
+  text-align: left;
+  padding: 0 8px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dtm-jt-meta-btn:hover {
+  border-color: var(--color-border-highlight, #7a7971);
+  background: rgba(255,255,255,0.06);
+}
+
+.dtm-jt-meta-btn em {
+  color: var(--color-text-light-tertiary, #777);
+  font-style: italic;
+}
+
+/* Output journal row: button + clear btn */
+.dtm-jt-output-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.dtm-jt-output-row .dtm-jt-meta-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.dtm-jt-clear-btn {
+  flex: 0 0 auto;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--color-text-light-tertiary, #888);
+  cursor: pointer;
+  padding: 3px 6px;
+  font-size: 11px;
+  height: 28px;
+}
+
+.dtm-jt-clear-btn:hover {
+  color: #ff4444;
+  background: rgba(255,68,68,0.1);
+}
+
+/* Row header */
+.dtm-jt-row-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 100px 1fr 28px;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-light-tertiary, #888);
+  flex-shrink: 0;
+}
+
+/* Key rows */
+.dtm-jt-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 100px 1fr 28px;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  transition: background-color 0.15s;
+}
+
+.dtm-jt-row:hover {
+  background: var(--color-bg-option, rgba(255,255,255,0.05));
+  border-color: var(--color-border-light-tertiary, #555);
+}
+
+.dtm-jt-col-key {
+  min-width: 0;
+}
+
+/* Source table button */
+.dtm-jt-source-btn {
+  height: 28px;
+  border: 1px dashed var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  background: var(--color-bg-option, rgba(0,0,0,0.1));
+  color: var(--color-text-light-primary, #eee);
+  font-size: 12px;
+  text-align: left;
+  padding: 0 8px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dtm-jt-source-btn:hover {
+  border-color: var(--color-border-highlight, #7a7971);
+  background: rgba(255,255,255,0.06);
+}
+
+.dtm-jt-source-btn em {
+  color: var(--color-text-light-tertiary, #777);
+  font-style: italic;
+}
+
+/* Mode select */
+.dtm-jt-col-mode {
+  min-width: 0;
+}
+
+/* Config area */
+.dtm-jt-col-config {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dtm-jt-percent {
+  width: 56px;
+  height: 28px;
+  border: 1px solid var(--color-border-light-tertiary, #444);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  background: var(--color-bg-option, rgba(0,0,0,0.1));
+  color: var(--color-text-light-primary, #eee);
+  -moz-appearance: textfield;
+}
+
+.dtm-jt-percent::-webkit-inner-spin-button,
+.dtm-jt-percent::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+.dtm-jt-config-label {
+  font-size: 12px;
+  color: var(--color-text-light-tertiary, #888);
+  flex-shrink: 0;
+}
+
+.dtm-jt-die {
+  height: 28px;
+  border: 1px solid var(--color-border-light-tertiary, #444);
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-size: 12px;
+  background: var(--color-bg-option, rgba(0,0,0,0.1));
+  color: var(--color-text-light-primary, #eee);
+  flex: 0 0 56px;
+}
+
+.dtm-jt-die option {
+  background: #1a1a2e;
+  color: #ddd;
+}
+
+.dtm-jt-trigger {
+  flex: 1;
+  height: 28px;
+  border: 1px solid var(--color-border-light-tertiary, #444);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-family: var(--font-mono, "Courier New", monospace);
+  background: var(--color-bg-option, rgba(0,0,0,0.1));
+  color: var(--color-text-light-primary, #eee);
+  min-width: 0;
+}
+
+/* Shared row input focus */
+.dtm-jt-row input[type="text"]:focus,
+.dtm-jt-row input[type="number"]:focus,
+.dtm-jt-row select:focus {
+  border-color: var(--color-border-highlight, #7a7971);
+  outline: none;
+}
+
+/* Chat card */
+.dtm-jt-chat-card {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dtm-jt-chat-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.dtm-jt-chat-pairs {
+  margin: 4px 0 8px 0;
+  padding-left: 16px;
+  list-style: disc;
+}
+
+.dtm-jt-chat-link {
+  margin-top: 4px;
+}
+

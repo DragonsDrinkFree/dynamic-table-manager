@@ -17,9 +17,7 @@ export class TableCreator {
    */
   static async createSingleTable(name, parsed, folderId) {
     const table = await RollTable.create({ name, formula: parsed.formula, description: "", folder: folderId });
-    await table.createEmbeddedDocuments("TableResult",
-      parsed.entries.map(e => TableCreator.#toResult(e)).filter(Boolean)
-    );
+    await table.createEmbeddedDocuments("TableResult", TableCreator.#buildResults(parsed.entries));
     return table;
   }
 
@@ -36,9 +34,7 @@ export class TableCreator {
     for (const col of parsed.columns) {
       const tableName = `${baseName} — ${col.header}`;
       const table = await RollTable.create({ name: tableName, formula: parsed.formula, description: "", folder: folderId });
-      await table.createEmbeddedDocuments("TableResult",
-        col.entries.map(e => TableCreator.#toResult(e)).filter(Boolean)
-      );
+      await table.createEmbeddedDocuments("TableResult", TableCreator.#buildResults(col.entries));
       subTables.push(table);
     }
     if (makeCompound) {
@@ -61,10 +57,13 @@ export class TableCreator {
     );
     allEntries.sort((a, b) => a.low - b.low);
     const table = await RollTable.create({ name: baseName, formula: parsed.formula, description: "", folder: folderId });
-    await table.createEmbeddedDocuments("TableResult",
-      allEntries.map(e => TableCreator.#toResult(e)).filter(Boolean)
-    );
+    await table.createEmbeddedDocuments("TableResult", TableCreator.#buildResults(allEntries));
     return table;
+  }
+
+  /** Map a parsed entry array to valid TableResult data objects, dropping invalid entries. */
+  static #buildResults(entries) {
+    return entries.map(e => TableCreator.#toResult(e)).filter(Boolean);
   }
 
   /**

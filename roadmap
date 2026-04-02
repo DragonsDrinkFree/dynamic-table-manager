@@ -6,3 +6,11 @@
     - Standard Roll table
     - Journal Page Builder.
     - Better editor.
+
+
+
+# Issues
+
+- Css for multi table past needs cleaning up
+- Compound table logic needs to be updated to match new linked lines.
+- Naming Systemfor multi-column tables should be updated. based on column name?

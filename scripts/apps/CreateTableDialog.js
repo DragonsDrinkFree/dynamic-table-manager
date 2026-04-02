@@ -1,4 +1,5 @@
 import { TableEditorWindow } from "./TableEditorWindow.js";
+import { JournalTemplateEditorWindow } from "./JournalTemplateEditorWindow.js";
 import { PDFScannerWindow } from "./PDFScannerWindow.js";
 import { PasteTableParser } from "../lib/PasteTableParser.js";
 import { TableCreator } from "../lib/TableCreator.js";
@@ -8,6 +9,7 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 export class CreateTableDialog extends HandlebarsApplicationMixin(ApplicationV2) {
 
   #method    = "manual";
+  #tableType = "basic";   // "basic" | "journal-template"
   #parsed    = null;      // last PasteTableParser result
   #splitMode = true;      // true = split into separate tables, false = merge into one
   #makeCompound = true;   // create top-level compound table when splitting
@@ -58,7 +60,11 @@ export class CreateTableDialog extends HandlebarsApplicationMixin(ApplicationV2)
     return {
       name: this.#name,
       defaultName: CreateTableDialog.#getDefaultTableName(),
-      tableTypes: [{ value: "basic", label: "Basic Table" }],
+      tableTypes: [
+        { value: "basic",            label: "Basic Table" },
+        { value: "journal-template", label: "Journal Template" }
+      ],
+      isJournalTemplate: this.#tableType === "journal-template",
       creationMethods: [
         { value: "manual",   label: "Manual" },
         { value: "paste",    label: "Paste Table" },
@@ -93,6 +99,14 @@ export class CreateTableDialog extends HandlebarsApplicationMixin(ApplicationV2)
       nameInput.value = this.#name;
       nameInput.addEventListener("input", (ev) => { this.#name = ev.target.value; });
     }
+
+    const typeSelect = this.element.querySelector("[name='tableType']");
+    if (typeSelect) typeSelect.value = this.#tableType;
+    typeSelect?.addEventListener("change", (ev) => {
+      this.#tableType = ev.target.value;
+      this.#parsed = null;
+      this.render();
+    });
 
     const methodSelect = this.element.querySelector("[name='creationMethod']");
     if (methodSelect) methodSelect.value = this.#method;
@@ -140,6 +154,18 @@ export class CreateTableDialog extends HandlebarsApplicationMixin(ApplicationV2)
     const form = this.element.querySelector("form");
     const name = form.querySelector("[name='name']")?.value.trim()
                || CreateTableDialog.#getDefaultTableName();
+
+    if (this.#tableType === "journal-template") {
+      const table = await RollTable.create({
+        name,
+        formula: "1",
+        folder: this.#folderId,
+        flags: { "dynamic-table-manager": { tableType: "journal-template" } }
+      });
+      JournalTemplateEditorWindow.openForTable(table);
+      this.close();
+      return;
+    }
 
     if (this.#method === "paste") {
       const raw = form.querySelector("[name='pasteContent']")?.value ?? "";

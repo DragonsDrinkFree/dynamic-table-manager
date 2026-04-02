@@ -4,6 +4,7 @@ import { TableSync } from "../lib/TableSync.js";
 import { LinkMatcher } from "../lib/LinkMatcher.js";
 import { DetectLinksDialog } from "./DetectLinksDialog.js";
 import { DocumentPickerPopup } from "./DocumentPickerPopup.js";
+import { parseRange } from "../lib/RangeParser.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -214,6 +215,11 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     };
   }
 
+  /** Record an undo entry, capturing after-state automatically. */
+  _recordUndo(type, before) {
+    this.undoManager.record({ type, before, after: this._getTableState() });
+  }
+
   // ---- Actions ----
 
   static async #onAddRow() {
@@ -226,7 +232,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       : 0;
     const newRange = [lastRange + 1, lastRange + 1];
 
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     await this.table.createEmbeddedDocuments("TableResult", [{
       type: CONST.TABLE_RESULT_TYPES.TEXT,
       name: "",
@@ -234,9 +240,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       weight: this._weightFromRange(newRange),
       flags: { "dynamic-table-manager": { order: maxOrder + 1, linked: false } }
     }]);
-    const afterState = this._getTableState();
-
-    this.undoManager.record({ type: "addRow", before: beforeState, after: afterState });
+    this._recordUndo("addRow", before);
     this.render();
   }
 
@@ -262,7 +266,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
     if (!confirmed) return;
 
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     const newResults = rows.map(row => ({
       type: CONST.TABLE_RESULT_TYPES.TEXT,
       name: "",
@@ -275,8 +279,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     // Update the table formula
     await this.table.update({ formula });
 
-    const afterState = this._getTableState();
-    this.undoManager.record({ type: "bulkAdd", before: beforeState, after: afterState });
+    this._recordUndo("bulkAdd", before);
     this.render();
   }
 
@@ -284,11 +287,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const rowId = target.closest("[data-result-id]")?.dataset.resultId;
     if (!rowId) return;
 
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     await this.table.deleteEmbeddedDocuments("TableResult", [rowId]);
-    const afterState = this._getTableState();
-
-    this.undoManager.record({ type: "deleteRow", before: beforeState, after: afterState });
+    this._recordUndo("deleteRow", before);
     this.render();
   }
 
@@ -328,10 +329,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     });
 
     if (value === null || value === "cancel") return;
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     await this.table.updateEmbeddedDocuments("TableResult", [{ _id: resultId, description: value }]);
-    const afterState = this._getTableState();
-    this.undoManager.record({ type: "editDescription", before: beforeState, after: afterState });
+    this._recordUndo("editDescription", before);
   }
 
   static async #onOpenDocument(event, target) {
@@ -427,10 +427,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       return;
     }
     const formula = `d${count}`;
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     await this.table.update({ formula });
-    const afterState = this._getTableState();
-    this.undoManager.record({ type: "edit_formula", before: beforeState, after: afterState });
+    this._recordUndo("edit_formula", before);
     this.render();
   }
 
@@ -535,15 +534,15 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const results = this.table.results.contents;
 
     // Rows that have content AND would actually change type (already-matching rows are never touched)
-    const filledRows = results.filter(r => r.type !== newType && !!(r.name?.trim() || r.documentUuid));
+    const rowsWithContent = results.filter(r => r.type !== newType && !!(r.name?.trim() || r.documentUuid));
 
     let keepContent = true;
-    if (filledRows.length > 0) {
+    if (rowsWithContent.length > 0) {
       const typeLabel = chosen === "text" ? "Text" : "Document";
       const action = await foundry.applications.api.DialogV2.wait({
         window: { title: "Change All Types" },
         content: `<p>Change all ${results.length} row(s) to <strong>${typeLabel}</strong>?</p>
-                  <p>${filledRows.length} row(s) have existing content.</p>`,
+                  <p>${rowsWithContent.length} row(s) have existing content.</p>`,
         rejectClose: false,
         buttons: [
           { action: "keep",    label: "Keep Content",  icon: "fas fa-check", default: true },
@@ -575,10 +574,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       return [update];
     });
 
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     await this.table.updateEmbeddedDocuments("TableResult", updates);
-    const afterState = this._getTableState();
-    this.undoManager.record({ type: "changeAllTypes", before: beforeState, after: afterState });
+    this._recordUndo("changeAllTypes", before);
     this.render();
   }
 
@@ -605,10 +603,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       return update;
     });
 
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     await this.table.updateEmbeddedDocuments("TableResult", updates);
-    const afterState = this._getTableState();
-    this.undoManager.record({ type: "toggleLink", before: beforeState, after: afterState });
+    this._recordUndo("toggleLink", before);
     this.render();
   }
 
@@ -631,10 +628,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       };
     });
 
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     await this.table.updateEmbeddedDocuments("TableResult", updates);
-    const afterState = this._getTableState();
-    this.undoManager.record({ type: "linkAll", before: beforeState, after: afterState });
+    this._recordUndo("linkAll", before);
     this.render();
   }
 
@@ -769,7 +765,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const selection = await DocumentPickerPopup.open(anchorRect, initialQuery);
     if (!selection) return;
 
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     await this.table.updateEmbeddedDocuments("TableResult", [{
       _id: resultId,
       type: CONST.TABLE_RESULT_TYPES.DOCUMENT,
@@ -777,8 +773,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       name: selection.name,
       img: selection.img ?? null
     }]);
-    const afterState = this._getTableState();
-    this.undoManager.record({ type: "editRowPicker", before: beforeState, after: afterState });
+    this._recordUndo("editRowPicker", before);
     this.render();
   }
 
@@ -793,13 +788,12 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
     // ---- Table-level fields (inside .dtm-editor-header) ----
     if (target.closest(".dtm-editor-header")) {
-      const beforeState = this._getTableState();
+      const before = this._getTableState();
       if (field === "name")        await this.table.update({ name: target.value });
       else if (field === "formula") await this.table.update({ formula: target.value });
       else if (field === "description") await this.table.update({ description: target.value });
       else return;
-      const afterState = this._getTableState();
-      this.undoManager.record({ type: `edit_${field}`, before: beforeState, after: afterState });
+      this._recordUndo(`edit_${field}`, before);
       return;
     }
 
@@ -818,10 +812,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       await this._updateRowRange(resultId, range);
 
     } else if (field === "name") {
-      const beforeState = this._getTableState();
+      const before = this._getTableState();
       await this.table.updateEmbeddedDocuments("TableResult", [{ _id: resultId, name: target.value }]);
-      const afterState = this._getTableState();
-      this.undoManager.record({ type: "editRow", before: beforeState, after: afterState });
+      this._recordUndo("editRow", before);
 
     } else if (field === "type") {
       const newType = target.value;
@@ -838,14 +831,13 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
         ? (this.table.results.get(resultId)?.name?.trim() ?? "")
         : "";
 
-      const beforeState = this._getTableState();
+      const before = this._getTableState();
       await this.table.updateEmbeddedDocuments("TableResult", [{
         _id: resultId,
         type: newType,
         ...(newType === CONST.TABLE_RESULT_TYPES.TEXT ? { documentUuid: "" } : {})
       }]);
-      const afterState = this._getTableState();
-      this.undoManager.record({ type: "editRowType", before: beforeState, after: afterState });
+      this._recordUndo("editRowType", before);
 
       if (isDocument) {
         this.render();
@@ -939,13 +931,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
    * @returns {number[]|null}
    */
   _parseRange(value) {
-    // Match patterns like: "5", "-3", "3-8", "-5-2", "-5--2"
-    const match = value.match(/^(-?\d+)(?:\s*-\s*(-?\d+))?$/);
-    if (!match) return null;
-    const low = parseInt(match[1]);
-    const high = match[2] !== undefined ? parseInt(match[2]) : low;
-    if (high < low) return null;
-    return [low, high];
+    return parseRange(value);
   }
 
   /**
@@ -980,7 +966,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     }
 
     // Capture before state BEFORE any mutations
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
 
     // Delete consumed rows
     if (consumed.length > 0) {
@@ -994,8 +980,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       weight: this._weightFromRange([newLow, newHigh])
     }]);
 
-    const afterState = this._getTableState();
-    this.undoManager.record({ type: "editRange", before: beforeState, after: afterState });
+    this._recordUndo("editRange", before);
     this.render();
   }
 
@@ -1139,10 +1124,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       flags: { "dynamic-table-manager": { order: maxOrder + i + 1, linked: false } }
     }));
 
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     await this.table.createEmbeddedDocuments("TableResult", newResults);
-    const afterState = this._getTableState();
-    this.undoManager.record({ type: "importCompendium", before: beforeState, after: afterState });
+    this._recordUndo("importCompendium", before);
     this.render();
   }
 
@@ -1167,10 +1151,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       if (!confirmed) return;
     }
 
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     await this.table.updateEmbeddedDocuments("TableResult", [{ _id: resultId, ...resolved }]);
-    const afterState = this._getTableState();
-    this.undoManager.record({ type: "editRowDrop", before: beforeState, after: afterState });
+    this._recordUndo("editRowDrop", before);
     this.render();
   }
 
@@ -1206,24 +1189,22 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
         // No gap — insert and shift all subsequent rows up by 1
         newLow = prev.range[1] + 1;
         const toShift = sorted.slice(insertIndex);
-        const beforeState = this._getTableState();
+        const before = this._getTableState();
         await this.table.updateEmbeddedDocuments("TableResult",
           toShift.map(r => ({ _id: r.id, range: [r.range[0] + 1, r.range[1] + 1] }))
         );
-        const afterState = this._getTableState();
-        this.undoManager.record({ type: "shiftRanges", before: beforeState, after: afterState });
+        this._recordUndo("shiftRanges", before);
       }
     }
 
     const newRange = [newLow, newLow];
-    const beforeState = this._getTableState();
+    const before = this._getTableState();
     await this.table.createEmbeddedDocuments("TableResult", [{
       ...resolved,
       range: newRange,
       weight: this._weightFromRange(newRange)
     }]);
-    const afterState = this._getTableState();
-    this.undoManager.record({ type: "insertRowDrop", before: beforeState, after: afterState });
+    this._recordUndo("insertRowDrop", before);
     this.render();
   }
 

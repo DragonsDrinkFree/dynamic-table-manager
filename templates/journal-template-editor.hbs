@@ -1,0 +1,127 @@
+{{!-- Journal Template Editor --}}
+<div class="dtm-editor-container dtm-jt-editor">
+
+  {{!-- Header --}}
+  <section class="dtm-editor-header">
+    <div class="dtm-field-group">
+      <label for="dtm-jt-name">Template Name</label>
+      <input id="dtm-jt-name" type="text" data-field="name" value="{{tableName}}" placeholder="Template Name" />
+    </div>
+
+    <div class="dtm-jt-meta-row">
+      <div class="dtm-jt-meta-group">
+        <span class="dtm-jt-meta-label">Template Page</span>
+        <button type="button" class="dtm-jt-meta-btn" data-action="pickTemplatePage" title="Choose journal page to use as template">
+          {{#if templatePageName}}
+            <i class="fas fa-book-open"></i> {{templatePageName}}
+          {{else}}
+            <i class="fas fa-book-open"></i> <em>Pick a page…</em>
+          {{/if}}
+        </button>
+      </div>
+
+      <div class="dtm-jt-meta-group">
+        <span class="dtm-jt-meta-label">Output Journal</span>
+        <div class="dtm-jt-output-row">
+          <button type="button" class="dtm-jt-meta-btn" data-action="pickOutputJournal" title="Set default output journal">
+            {{#if outputJournalName}}
+              <i class="fas fa-journal-whills"></i> {{outputJournalName}}
+            {{else}}
+              <i class="fas fa-journal-whills"></i> <em>Prompt on roll</em>
+            {{/if}}
+          </button>
+          {{#if outputJournalName}}
+          <button type="button" class="dtm-jt-clear-btn" data-action="clearOutputJournal" title="Clear default journal">
+            <i class="fas fa-times"></i>
+          </button>
+          {{/if}}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {{!-- Toolbar --}}
+  <section class="dtm-toolbar">
+    <div class="dtm-toolbar-left">
+      <button type="button" data-action="addKey" title="Add Key">
+        <i class="fas fa-plus"></i> Add Key
+      </button>
+      <button type="button" data-action="rollTemplate" title="Roll and generate journal page">
+        <i class="fas fa-scroll"></i> Generate
+      </button>
+    </div>
+    <div class="dtm-toolbar-right">
+      <button type="button" data-action="undo" title="Undo (Ctrl+Z)" {{#unless canUndo}}disabled{{/unless}}>
+        <i class="fas fa-undo"></i>
+      </button>
+      <button type="button" data-action="redo" title="Redo (Ctrl+Y)" {{#unless canRedo}}disabled{{/unless}}>
+        <i class="fas fa-redo"></i>
+      </button>
+    </div>
+  </section>
+
+  {{!-- Column Headers --}}
+  <div class="dtm-row-header dtm-jt-row-header">
+    <span class="dtm-jt-col-key">Key</span>
+    <span class="dtm-jt-col-source">Source Table</span>
+    <span class="dtm-jt-col-mode">Mode</span>
+    <span class="dtm-jt-col-config">Config</span>
+    <span class="dtm-col-actions"></span>
+  </div>
+
+  {{!-- Key List --}}
+  <section class="dtm-row-list dtm-jt-row-list">
+    {{#each keys}}
+    <div class="dtm-row dtm-jt-row" data-key-id="{{this.id}}">
+
+      <input type="text" class="dtm-jt-col-key" data-field="key"
+        value="{{this.key}}" placeholder="Key name…"
+        title="Use {{'{{'}}{{this.key}}{{'}}'}} in your template page" />
+
+      <button type="button" class="dtm-jt-col-source dtm-jt-source-btn"
+        data-action="pickSourceTable" title="Choose source table">
+        {{#if this.tableName}}
+          <i class="fas fa-table"></i> {{this.tableName}}
+        {{else}}
+          <i class="fas fa-table"></i> <em>Pick a table…</em>
+        {{/if}}
+      </button>
+
+      <select class="dtm-jt-col-mode" data-field="mode">
+        <option value="guaranteed" {{#if this.isGuaranteed}}selected{{/if}}>Guaranteed</option>
+        <option value="percent"    {{#if this.isPercent}}selected{{/if}}>% Chance</option>
+        <option value="dice"       {{#if this.isDice}}selected{{/if}}>Dice Chance</option>
+      </select>
+
+      <div class="dtm-jt-col-config">
+        {{#if this.isPercent}}
+          <input type="number" class="dtm-jt-percent" data-field="percent"
+            value="{{this.percent}}" min="1" max="100" placeholder="%" title="Percent chance (1–100)" />
+          <span class="dtm-jt-config-label">%</span>
+        {{else if this.isDice}}
+          <select class="dtm-jt-die" data-field="die">
+            {{#each ../dieOptions}}
+            <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+            {{/each}}
+          </select>
+          <input type="text" class="dtm-jt-trigger" data-field="triggerRange"
+            value="{{this.triggerRange}}" placeholder="e.g. 5-6" title="Trigger on this roll result or range" />
+        {{/if}}
+      </div>
+
+      <div class="dtm-col-actions">
+        <button type="button" data-action="deleteKey" title="Delete Key">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    </div>
+    {{/each}}
+
+    {{#unless keys.length}}
+    <div class="dtm-empty-state">
+      <p>No keys yet. Click <strong>Add Key</strong> to get started.</p>
+    </div>
+    {{/unless}}
+  </section>
+
+</div>
