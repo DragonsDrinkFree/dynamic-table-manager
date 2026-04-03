@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "compatibility": {
     "minimum": "13",
-    "verified": "13"
+    "verified": "13.351"
   },
 "authors": [
     {
@@ -22,7 +22,7 @@
   "flags": {
     "canUpload": true
   },
-  "description": "<p>Create and manage tables with improved ease and functionality.</p>",
+  "description": "<p>Create and manage tables with improved ease and functionality. Supports Copy/Paste of tables, and direct scanning from uploaded PDF. Allows you to post tables with multiple columsn which can automatically be split into multiple tables with an option to create a compound table which rolls on all tables.</p>",
   "packs": [
     {
       "name": "ddf-dynamic-table-manager",
