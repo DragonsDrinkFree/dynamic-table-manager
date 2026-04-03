@@ -69,12 +69,13 @@ export class DTMTableDirectory extends RollTableDirectory {
    * @param {HTMLElement} root
    */
   _bindTableClicks(root) {
+    // Use capture phase so our handler fires before Foundry's child-element listeners.
     root.addEventListener("click", (ev) => {
       const entry = ev.target.closest("[data-entry-id]:not(.folder)");
       if (!entry) return;
       if (ev.target.closest("button") || ev.target.closest("a.control")) return;
       ev.preventDefault();
-      ev.stopPropagation();
+      ev.stopImmediatePropagation();
       const table = game.tables.get(entry.dataset.entryId);
       if (!table) return;
       if (table.getFlag("dynamic-table-manager", "tableType") === "journal-template") {
@@ -82,7 +83,7 @@ export class DTMTableDirectory extends RollTableDirectory {
       } else {
         TableEditorWindow.openForTable(table);
       }
-    });
+    }, true);
   }
 
   /**

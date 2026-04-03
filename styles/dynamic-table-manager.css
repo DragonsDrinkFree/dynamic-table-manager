@@ -754,29 +754,38 @@ input.dtm-col-range:disabled {
 .dtm-multi-options {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
 .dtm-radio-label,
 .dtm-checkbox-label {
   display: flex;
-  align-items: center;
-  gap: 7px;
+  align-items: baseline;
+  gap: 8px;
   font-size: 12px;
   cursor: pointer;
   color: var(--color-text-light-primary, #ddd);
-  line-height: 1.4;
+  line-height: 1.5;
+  padding: 3px 6px;
+  border-radius: 3px;
+}
+
+.dtm-radio-label:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .dtm-radio-label input[type="radio"],
 .dtm-checkbox-label input[type="checkbox"] {
+  flex-shrink: 0;
   width: 13px;
   height: 13px;
   min-width: 13px;
   margin: 0;
   cursor: pointer;
   accent-color: rgba(100, 160, 255, 0.9);
-  flex-shrink: 0;
+  /* Reset any Foundry overrides that add phantom elements */
+  box-shadow: none;
+  outline: none;
 }
 
 .dtm-radio-label em,
@@ -786,8 +795,15 @@ input.dtm-col-range:disabled {
 }
 
 .dtm-compound-option {
-  padding-left: 20px;
+  margin-left: 21px; /* align with radio text: 13px input + 8px gap */
   color: rgba(160, 200, 255, 0.9);
+  border-left: 2px solid rgba(100, 160, 255, 0.3);
+  padding-left: 8px;
+  border-radius: 0 3px 3px 0;
+}
+
+.dtm-compound-option:hover {
+  background: rgba(100, 160, 255, 0.06);
 }
 
 /* Multi-column preview grid */

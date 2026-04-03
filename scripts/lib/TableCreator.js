@@ -104,8 +104,9 @@ export class TableCreator {
         documentUuid: t.uuid,
         name: t.name,
         img: t.img,
-        range: [i + 1, i + 1],
-        weight: 1
+        range: [1, 1],
+        weight: 1,
+        flags: { [MODULE_ID]: { order: i, linked: i > 0 } }
       }))
     );
     return compound;

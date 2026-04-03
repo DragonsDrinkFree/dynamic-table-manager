@@ -121,9 +121,11 @@ export class CreateTableDialog extends HandlebarsApplicationMixin(ApplicationV2)
       }
     });
 
-    this.element.querySelector("[name='splitMode']")?.addEventListener("change", (ev) => {
-      this.#splitMode = ev.target.value === "split";
-      this.render();
+    this.element.querySelectorAll("[name='splitMode']").forEach(el => {
+      el.addEventListener("change", (ev) => {
+        this.#splitMode = ev.target.value === "split";
+        this.render();
+      });
     });
 
     this.element.querySelector("[name='makeCompound']")?.addEventListener("change", (ev) => {

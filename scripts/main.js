@@ -14,6 +14,19 @@ Hooks.once("init", () => {
   Handlebars.registerHelper("subtract", (a, b) => Number(a) - Number(b));
 });
 
+Hooks.once("setup", () => {
+  // Replace the native RollTable sheet with a stub that opens our editor.
+  // Done in "setup" (after "init") so CONFIG.RollTable.sheetClass is guaranteed to be set.
+  const NativeSheet = CONFIG.RollTable.sheetClass;
+  class DTMSheetInterceptor extends NativeSheet {
+    render(...args) {
+      TableEditorWindow.openForTable(this.document ?? this.object);
+      return this;
+    }
+  }
+  CONFIG.RollTable.sheetClass = DTMSheetInterceptor;
+});
+
 Hooks.once("ready", () => {
   console.log(`${MODULE_ID} | Dynamic Table Manager ready`);
 });
