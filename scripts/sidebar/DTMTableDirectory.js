@@ -23,7 +23,7 @@ export class DTMTableDirectory extends RollTableDirectory {
   }
 
   /**
-   * Inject the "New Table" button and search bar into the sidebar header.
+   * Inject the "Create Dynamic Table" button into the sidebar header, below the native buttons.
    * @param {HTMLElement} root
    */
   _injectHeaderControls(root) {
@@ -37,29 +37,19 @@ export class DTMTableDirectory extends RollTableDirectory {
       root.prepend(header);
     }
 
-    if (!root.querySelector(".dtm-search")) {
-      const searchDiv = document.createElement("div");
-      searchDiv.classList.add("dtm-search");
-      searchDiv.innerHTML = `<input type="text" placeholder="Search tables..." autocomplete="off" />`;
-      header.after(searchDiv);
-      searchDiv.querySelector("input").addEventListener("input", (ev) => {
-        this._filterEntries(root, ev.currentTarget.value.toLowerCase().trim());
-      });
-    }
-
     if (!root.querySelector(".dtm-create-table")) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.classList.add("dtm-create-table");
-      btn.innerHTML = `<i class="fas fa-plus"></i> New Table`;
+      btn.innerHTML = `<i class="fas fa-plus"></i> Create Dynamic Table`;
       btn.addEventListener("click", (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
         new CreateTableDialog().render(true);
       });
 
-      const actionArea = header.querySelector(".header-actions") ?? header.querySelector(".action-buttons");
-      if (actionArea) actionArea.prepend(btn);
+      const searchEl = header.querySelector("search, .search-primary, input[type='search']");
+      if (searchEl) searchEl.before(btn);
       else header.append(btn);
     }
   }
@@ -86,25 +76,4 @@ export class DTMTableDirectory extends RollTableDirectory {
     }, true);
   }
 
-  /**
-   * Filter directory entries by search query.
-   * @param {HTMLElement} root
-   * @param {string} query
-   */
-  _filterEntries(root, query) {
-    const entries = root.querySelectorAll("[data-entry-id]:not(.folder)");
-    if (!query) {
-      entries.forEach(el => el.style.display = "");
-      root.querySelectorAll(".folder").forEach(f => f.style.display = "");
-      return;
-    }
-    entries.forEach(el => {
-      const name = el.textContent?.toLowerCase() ?? "";
-      el.style.display = name.includes(query) ? "" : "none";
-    });
-    root.querySelectorAll(".folder").forEach(folder => {
-      const hasVisible = folder.querySelector("[data-entry-id]:not(.folder):not([style*='display: none'])");
-      folder.style.display = hasVisible ? "" : "none";
-    });
-  }
 }

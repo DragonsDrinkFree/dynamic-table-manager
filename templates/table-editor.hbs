@@ -71,6 +71,7 @@
       Type
       <button type="button" class="dtm-type-all-btn" data-action="changeAllTypes" title="Set type for all rows"><i class="fas fa-exchange-alt"></i></button>
     </span>
+    <span class="dtm-col-drag"></span>
     <span class="dtm-col-content">Content</span>
     <span class="dtm-col-actions"></span>
   </div>
@@ -89,6 +90,8 @@
         <option value="{{this.value}}">{{this.label}}</option>
         {{/each}}
       </select>
+
+      <span class="dtm-drag-handle" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></span>
 
       <div class="dtm-col-content">
         {{#if this.isText}}

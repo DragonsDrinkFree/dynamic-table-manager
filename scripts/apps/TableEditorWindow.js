@@ -288,6 +288,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     if (!rowId) return;
 
     const before = this._getTableState();
+    this._restoreScrollTop = this.element?.querySelector(".dtm-row-list")?.scrollTop;
     await this.table.deleteEmbeddedDocuments("TableResult", [rowId]);
     this._recordUndo("deleteRow", before);
     this.render();
@@ -640,6 +641,13 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
   _onRender(context, options) {
     const html = this.element;
 
+    // Restore scroll position if a reorder just happened
+    if (this._restoreScrollTop !== undefined) {
+      const rowList = html.querySelector(".dtm-row-list");
+      if (rowList) rowList.scrollTop = this._restoreScrollTop;
+      delete this._restoreScrollTop;
+    }
+
     // Set type dropdown selected values — Handlebars can't compare strings reliably
     html.querySelectorAll("select[data-field='type']").forEach(select => {
       select.value = select.dataset.currentType;
@@ -674,6 +682,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
     // Drag-and-drop: full row-list handling
     this._dragState = null;
+    this._isRowReorderDrag = false;
     const rowList = html.querySelector(".dtm-row-list");
     if (rowList) {
       const indicator = document.createElement("div");
@@ -681,9 +690,32 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       indicator.style.display = "none";
       rowList.appendChild(indicator);
 
+      // Only allow row dragging when the grip handle is the mousedown origin
+      rowList.addEventListener("mousedown", (ev) => {
+        const handle = ev.target.closest(".dtm-drag-handle");
+        const row = handle?.closest(".dtm-row");
+        if (!row) return;
+        row.draggable = true;
+        row.addEventListener("dragend", () => {
+          row.draggable = false;
+          this._isRowReorderDrag = false;
+        }, { once: true });
+      });
+
+      rowList.addEventListener("dragstart", (ev) => {
+        const row = ev.target.closest(".dtm-row");
+        if (!row?.draggable) { ev.preventDefault(); return; }
+        this._isRowReorderDrag = true;
+        ev.dataTransfer.effectAllowed = "move";
+        ev.dataTransfer.setData("text/plain", JSON.stringify({
+          type: "dtm-row-reorder",
+          resultId: row.dataset.resultId
+        }));
+      });
+
       rowList.addEventListener("dragover", (ev) => {
         ev.preventDefault();
-        ev.dataTransfer.dropEffect = "link";
+        ev.dataTransfer.dropEffect = this._isRowReorderDrag ? "move" : "link";
         this._onDragOver(ev, rowList, indicator);
       });
 
@@ -700,6 +732,10 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
         this._clearDragVisuals(rowList, indicator);
         this._dragState = null;
         const data = TextEditor.getDragEventData(ev);
+        if (data?.type === "dtm-row-reorder") {
+          await this._handleRowReorder(data.resultId, state?.insertIndex ?? -1);
+          return;
+        }
         if (data?.type === "Compendium") {
           await this._handleDropCompendium(data, ev);
           return;
@@ -941,39 +977,34 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
    */
   async _updateRowRange(resultId, newRange) {
     const [newLow, newHigh] = newRange;
+    const shiftSize = newHigh - newLow + 1;
 
-    // Find rows that would be consumed by this new range
-    const consumed = this.table.results.filter(r => {
+    // Find rows that conflict with the new range (excluding the row being edited)
+    const conflicting = this.table.results.filter(r => {
       if (r.id === resultId) return false;
-      return r.range[0] >= newLow && r.range[1] <= newHigh;
+      return r.range[0] <= newHigh && r.range[1] >= newLow;
     });
 
-    // Smart merge: check if consumed rows have content
-    if (consumed.length > 0) {
-      const withContent = consumed.filter(r => r.name?.trim() || r.description?.trim());
-      if (withContent.length > 0) {
-        const names = withContent.map(r => `Row ${r.range[0]}-${r.range[1]}: "${r.name || r.description}"`).join("<br>");
-        const confirmed = await foundry.applications.api.DialogV2.confirm({
-          window: { title: "Merge Rows" },
-          content: `<p>The following rows have content and will be removed:</p><p>${names}</p><p>Continue?</p>`,
-          rejectClose: false
-        });
-        if (!confirmed) {
-          this.render();
-          return;
-        }
+    const before = this._getTableState();
+
+    // Shift conflicting rows and all subsequent rows up to make room
+    if (conflicting.length > 0) {
+      const toShift = this.table.results.filter(r => {
+        if (r.id === resultId) return false;
+        return r.range[0] >= newLow;
+      });
+      if (toShift.length > 0) {
+        await this.table.updateEmbeddedDocuments("TableResult",
+          toShift.map(r => ({
+            _id: r.id,
+            range: [r.range[0] + shiftSize, r.range[1] + shiftSize],
+            weight: this._weightFromRange([r.range[0] + shiftSize, r.range[1] + shiftSize])
+          }))
+        );
       }
     }
 
-    // Capture before state BEFORE any mutations
-    const before = this._getTableState();
-
-    // Delete consumed rows
-    if (consumed.length > 0) {
-      await this.table.deleteEmbeddedDocuments("TableResult", consumed.map(r => r.id));
-    }
-
-    // Update the target row's range and recalculate weight
+    // Update the target row's range
     await this.table.updateEmbeddedDocuments("TableResult", [{
       _id: resultId,
       range: [newLow, newHigh],
@@ -1039,6 +1070,41 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
   _clearDragVisuals(rowList, indicator) {
     rowList.querySelectorAll(".dtm-drag-over").forEach(r => r.classList.remove("dtm-drag-over"));
     indicator.style.display = "none";
+  }
+
+  /**
+   * Reorder rows by reassigning ranges to reflect the new visual order.
+   * The dragged row takes the range slot at insertIndex; everything shifts to match.
+   * @param {string} draggedId
+   * @param {number} insertIndex
+   */
+  async _handleRowReorder(draggedId, insertIndex) {
+    const sorted = this._sortedResults();
+    const draggedIdx = sorted.findIndex(r => r.id === draggedId);
+    if (draggedIdx === -1) return;
+
+    // Normalise insertIndex so "after the dragged row" and "before it" both no-op correctly
+    const effectiveInsert = insertIndex > draggedIdx ? insertIndex - 1 : insertIndex;
+    if (effectiveInsert === draggedIdx) return;
+
+    // Build new order
+    const reordered = [...sorted];
+    const [dragged] = reordered.splice(draggedIdx, 1);
+    reordered.splice(effectiveInsert, 0, dragged);
+
+    // Reassign ranges: give each row the range slot that was at its new position
+    const oldRanges = sorted.map(r => r.range);
+    const updates = reordered.map((r, i) => ({
+      _id: r.id,
+      range: oldRanges[i],
+      weight: this._weightFromRange(oldRanges[i])
+    }));
+
+    const before = this._getTableState();
+    this._restoreScrollTop = this.element?.querySelector(".dtm-row-list")?.scrollTop;
+    await this.table.updateEmbeddedDocuments("TableResult", updates);
+    this._recordUndo("reorderRows", before);
+    this.render();
   }
 
   /**

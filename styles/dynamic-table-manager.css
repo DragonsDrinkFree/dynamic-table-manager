@@ -40,7 +40,7 @@
 }
 
 button.dtm-create-table {
-  flex: 0 0 auto;
+  width: 100%;
   white-space: nowrap;
 }
 
@@ -241,22 +241,33 @@ button.dtm-create-table {
 /* Insert indicator — horizontal line shown between rows */
 .dtm-insert-indicator {
   height: 2px;
-  margin: 1px 8px;
-  background: rgba(100, 160, 255, 0.8);
+  margin: 0 4px;
+  background: rgba(100, 160, 255, 0.9);
   border-radius: 1px;
   pointer-events: none;
   position: relative;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+.dtm-insert-indicator::before,
+.dtm-insert-indicator::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(100, 160, 255, 0.9);
 }
 
 .dtm-insert-indicator::before {
-  content: "";
-  position: absolute;
   left: -4px;
-  top: -4px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: rgba(100, 160, 255, 0.9);
+}
+
+.dtm-insert-indicator::after {
+  right: -4px;
 }
 
 /* Type header cell — stacks label and change-all button */
@@ -331,6 +342,29 @@ button.dtm-create-table {
 
 .dtm-col-type {
   flex: 0 0 90px;
+}
+
+.dtm-col-drag {
+  flex: 0 0 16px;
+}
+
+.dtm-drag-handle {
+  flex: 0 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: var(--color-text-light-tertiary, #666);
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+
+.dtm-row:hover .dtm-drag-handle {
+  opacity: 1;
+}
+
+.dtm-drag-handle:active {
+  cursor: grabbing;
 }
 
 .dtm-col-content {
