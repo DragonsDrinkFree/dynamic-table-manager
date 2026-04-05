@@ -23,18 +23,6 @@
     "canUpload": true
   },
   "description": "<p>Create and manage tables with improved ease and functionality. Supports Copy/Paste of tables, and direct scanning from uploaded PDF. Allows you to post tables with multiple columsn which can automatically be split into multiple tables with an option to create a compound table which rolls on all tables.</p>",
-  "packs": [
-    {
-      "name": "ddf-dynamic-table-manager",
-      "label": "Guide: Dynamic table Manager",
-      "path": "packs/ddf-dynamic-table-manager",
-      "type": "JournalEntry",
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      }
-    }
-  ],
     "url": "https://github.com/DragonsDrinkFree/dynamic-table-manager/",
   "manifest": "https://github.com/DragonsDrinkFree/dynamic-table-manager/releases/latest/download/module.json",
   "download": "https://github.com/DragonsDrinkFree/dynamic-table-manager/releases/latest/download/dynamic-table-manager.zip"
