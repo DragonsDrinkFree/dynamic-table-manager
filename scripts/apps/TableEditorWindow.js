@@ -387,11 +387,13 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       }
     }
 
-    await ChatMessage.create({
+    const msgData = {
       content: `<div class="dtm-compound-roll"><p><em>${this.table.name}</em></p>${lines.map(l => `<p>${l}</p>`).join("")}</div>`,
-      type: CONST.CHAT_MESSAGE_TYPES?.ROLL ?? 0,
       rolls: [roll]
-    });
+    };
+    // CONST.CHAT_MESSAGE_TYPES was removed in Foundry v14
+    if (CONST.CHAT_MESSAGE_TYPES?.ROLL !== undefined) msgData.type = CONST.CHAT_MESSAGE_TYPES.ROLL;
+    await ChatMessage.create(msgData);
   }
 
   static async #onUndo() {
