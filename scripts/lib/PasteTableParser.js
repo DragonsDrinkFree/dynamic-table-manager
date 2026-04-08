@@ -97,12 +97,14 @@ export class PasteTableParser {
       const n = e.contentLines.length;
       freq[n] = (freq[n] ?? 0) + 1;
     }
-    const dominantCount = Number(
-      Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0]
-    );
+    const [dominantCountStr, dominantFreqCount] = Object.entries(freq).sort((a, b) => b[1] - a[1])[0];
+    const dominantCount = Number(dominantCountStr);
+    const dominantRatio = dominantFreqCount / rawEntries.length;
 
-    // Single column — join multi-line content, sort for interleaved columns
-    if (dominantCount <= 1) {
+    // Single column — join multi-line content, sort for interleaved columns.
+    // Also treat as single-column when line counts vary widely (wrapped text), which
+    // produces an inconsistent dominant ratio even though dominantCount > 1.
+    if (dominantCount <= 1 || dominantRatio < 0.75) {
       const entries = rawEntries.map(e => ({
         low: e.low,
         high: e.high,

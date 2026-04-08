@@ -34,14 +34,24 @@ export class PDFTableExtractor {
     if (allRows.length === 0) return { formula: "", isMultiColumn: false, entries: [] };
 
     // Identify data rows: rows whose leftmost item starts with a number (the range column).
-    // This strips headers ("How Did They Originate?"), dice labels ("d8"), and paragraph text
-    // that were accidentally included in the selection box.
-    const dataRows = allRows.filter(rowItems => {
+    // Continuation rows (wrapped content with no range number) are merged into their parent
+    // row so that wrapped cell text is not lost.
+    const dataRows = [];
+    let currentGroup = null;
+    for (const rowItems of allRows) {
       const firstStr = rowItems[0]?.str?.trim() ?? "";
-      // Take only the first whitespace-delimited token, strip trailing punctuation
       const firstToken = firstStr.split(/\s+/)[0].replace(/[.):\]]+$/, "");
-      return PasteTableParser.NUMBER_LINE.test(firstToken);
-    });
+      if (PasteTableParser.NUMBER_LINE.test(firstToken)) {
+        currentGroup = [...rowItems];
+        dataRows.push(currentGroup);
+      } else if (currentGroup !== null) {
+        // Continuation line — absorb its items into the current numbered row.
+        // #buildCellGrid assigns items to columns by X position, so text lands
+        // in the correct column and is joined with its siblings automatically.
+        currentGroup.push(...rowItems);
+      }
+      // Non-numbered rows before the first numbered row are headers — skip them.
+    }
 
     // Use numeric-first rows for column detection when available; otherwise fall back.
     const hasRangeCol = dataRows.length >= 2;

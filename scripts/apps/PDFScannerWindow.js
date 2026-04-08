@@ -27,15 +27,18 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
   // ---- Creation context ----
   #folderId      = null;
-  #suggestedName = "";
+
+  // ---- Footer options (persist across re-renders) ----
+  #usePrefix     = false;
+  #tablePrefix   = "";
+  #makeCompound  = true;
 
   // ---- pdf.js module (lazy) ----
   static #pdfjs = null;
 
   constructor(options = {}) {
     super(options);
-    this.#folderId     = options.folderId     ?? null;
-    this.#suggestedName = options.suggestedName ?? "";
+    this.#folderId = options.folderId ?? null;
   }
 
   static DEFAULT_OPTIONS = {
@@ -95,8 +98,10 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
           ? (activeRegion.parsed?.entries ?? []).slice(0, 10)
           : null
       } : null,
-      suggestedName: this.#suggestedName,
-      hasRegions: this.#regions.length > 0
+      hasRegions:    this.#regions.length > 0,
+      usePrefix:     this.#usePrefix,
+      tablePrefix:   this.#tablePrefix,
+      makeCompound:  this.#makeCompound
     };
   }
 
@@ -104,6 +109,7 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
   _onRender(context, options) {
     this.#attachCanvasListeners();
     this.#attachRegionListeners();
+    this.#attachFooterListeners();
 
     // Page jump input
     const pageInput = this.element.querySelector(".dtm-page-input");
@@ -250,6 +256,30 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     });
   }
 
+  // ---- Footer option listeners ----
+
+  #attachFooterListeners() {
+    const prefixCheck = this.element?.querySelector("[name='usePrefix']");
+    const prefixInput = this.element?.querySelector("[name='tablePrefix']");
+    const compoundCheck = this.element?.querySelector("[name='makeCompound']");
+
+    if (prefixCheck && prefixInput) {
+      prefixCheck.addEventListener("change", () => {
+        this.#usePrefix = prefixCheck.checked;
+        prefixInput.disabled = !prefixCheck.checked;
+        if (prefixCheck.checked) prefixInput.focus();
+      });
+      prefixInput.addEventListener("input", () => {
+        this.#tablePrefix = prefixInput.value;
+      });
+    }
+    if (compoundCheck) {
+      compoundCheck.addEventListener("change", () => {
+        this.#makeCompound = compoundCheck.checked;
+      });
+    }
+  }
+
   // ---- Region name editing (delegated) ----
 
   #attachRegionListeners() {
@@ -382,15 +412,14 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     const skipped = this.#regions.length - withData.length;
     if (skipped > 0) ui.notifications.warn(`${skipped} region(s) had no data and were skipped.`);
 
-    const nameBase = this.element.querySelector("[name='baseName']")?.value.trim()
-                   || this.#suggestedName || "PDF Table";
+    const prefix       = this.#usePrefix ? (this.#tablePrefix.trim() || "") : "";
+    const makeCompound = this.#makeCompound;
 
     const allTables = [];
-    for (let i = 0; i < withData.length; i++) {
-      const region = withData[i];
-      const tableName = `${nameBase}: Table ${i + 1}`;
+    for (const region of withData) {
+      const tableName = prefix ? `${prefix}: ${region.name}` : region.name;
       if (region.parsed.isMultiColumn) {
-        const tables = await TableCreator.createSplitTables(tableName, region.parsed, this.#folderId, true);
+        const tables = await TableCreator.createSplitTables(tableName, region.parsed, this.#folderId, makeCompound);
         allTables.push(...tables);
       } else {
         allTables.push(await TableCreator.createSingleTable(tableName, region.parsed, this.#folderId));

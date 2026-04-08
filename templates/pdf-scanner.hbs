@@ -106,9 +106,16 @@
     {{/if}}
 
     <div class="dtm-scanner-footer">
-      <div class="dtm-field-group">
-        <label>Base Table Name</label>
-        <input type="text" name="baseName" value="{{suggestedName}}" placeholder="PDF Table">
+      <div class="dtm-scanner-options">
+        <label class="dtm-option-row">
+          <input type="checkbox" name="usePrefix" {{#if usePrefix}}checked{{/if}}>
+          Add prefix to table names:
+          <input type="text" name="tablePrefix" value="{{tablePrefix}}" placeholder="e.g. Traveller" class="dtm-prefix-input" {{#unless usePrefix}}disabled{{/unless}}>
+        </label>
+        <label class="dtm-option-row">
+          <input type="checkbox" name="makeCompound" {{#if makeCompound}}checked{{/if}}>
+          Create compound table for multi-column regions
+        </label>
       </div>
       <div class="dtm-dialog-buttons">
         <button type="button" data-action="createTables" class="dtm-btn-primary"
