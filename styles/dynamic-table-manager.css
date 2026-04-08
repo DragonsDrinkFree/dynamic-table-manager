@@ -511,6 +511,27 @@ button.dtm-create-table {
   line-height: 1.5;
 }
 
+/* Journal template keyword hint */
+.dtm-jt-hint {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--color-text-light-tertiary, #888);
+  border-top: 1px solid var(--color-border-light-tertiary, #444);
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.dtm-jt-hint code {
+  font-family: monospace;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 2px;
+  padding: 0 3px;
+  color: var(--color-text-light-secondary, #bbb);
+}
+
 /* --- Create Table Dialog --- */
 
 .dtm-create-dialog-container {
