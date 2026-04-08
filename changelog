@@ -1,0 +1,10 @@
+# V1.1.0
+
+## Major
+- Improved table parsing for table results with multiple lines that wrap.
+
+## Minor
+- Added Informational note to journal template tables to make them more understandable.
+- Fixed bug that was preventing tables in PDF scan mode from being renamed.
+- Changed the way tables are named with prefix
+- Checkbox in pdf scan mode to decide on the creation of compound tables. 
