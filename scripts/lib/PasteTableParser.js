@@ -19,8 +19,20 @@ export class PasteTableParser {
   /** Matches a standalone range or single number: "1", "3-8", "11-20", "01–10" */
   static NUMBER_LINE = /^(-?\d+)\s*[-–—]\s*(-?\d+)$|^(-?\d+)$/;
 
+  /**
+   * Matches a range at the START of a line followed by content on the same line:
+   * "03–04 A bloodstained jester's hat."
+   * Captures: [1]=low, [2]=high, [3]=content
+   */
+  static INLINE_RANGE = /^(-?\d+)\s*[-–—]\s*(-?\d+)\s+(.+)$/;
+
   /** Matches dice notation: d6, 2d10, d100+5 */
   static DICE_LINE = /^\s*-?\d*[dD]\d+([+-]\d+)?\s*$/;
+
+  /** Returns true if a line starts a new table entry (pure range/number OR inline range+content). */
+  static _isEntryStart(line) {
+    return this.NUMBER_LINE.test(line) || this.INLINE_RANGE.test(line);
+  }
 
   /**
    * Parse raw pasted text.
@@ -51,11 +63,11 @@ export class PasteTableParser {
       }
     }
 
-    // Collect header lines (non-number, non-formula lines before first number)
+    // Collect header lines (non-number, non-formula lines before first entry)
     let dataStart = 0;
     const headerLines = [];
     for (let i = 0; i < lines.length; i++) {
-      if (this.NUMBER_LINE.test(lines[i])) {
+      if (this._isEntryStart(lines[i])) {
         dataStart = i;
         break;
       }
@@ -71,20 +83,41 @@ export class PasteTableParser {
     let i = 0;
     while (i < dataLines.length) {
       const line = dataLines[i];
-      const match = line.match(this.NUMBER_LINE);
-      if (match) {
-        const low  = parseInt(match[1] ?? match[3]);
-        const high = match[2] !== undefined ? parseInt(match[2]) : low;
+
+      // Case 1: pure range/number line — content follows on subsequent lines
+      const numMatch = line.match(this.NUMBER_LINE);
+      if (numMatch) {
+        const low  = parseInt(numMatch[1] ?? numMatch[3]);
+        const rawHigh = numMatch[2] !== undefined ? parseInt(numMatch[2]) : low;
+        const high = rawHigh === 0 && low > 0 ? 100 : rawHigh;
         const contentLines = [];
         i++;
-        while (i < dataLines.length && !this.NUMBER_LINE.test(dataLines[i])) {
+        while (i < dataLines.length && !this._isEntryStart(dataLines[i])) {
           contentLines.push(dataLines[i]);
           i++;
         }
         rawEntries.push({ low, high, contentLines });
-      } else {
-        i++;
+        continue;
       }
+
+      // Case 2: range + content on the same line ("03–04 A bloodstained jester's hat.")
+      const inlineMatch = line.match(this.INLINE_RANGE);
+      if (inlineMatch) {
+        const low  = parseInt(inlineMatch[1]);
+        const rawHigh = parseInt(inlineMatch[2]);
+        const high = rawHigh === 0 && low > 0 ? 100 : rawHigh;
+        const contentLines = [inlineMatch[3].trim()];
+        i++;
+        // collect any wrapped continuation lines
+        while (i < dataLines.length && !this._isEntryStart(dataLines[i])) {
+          contentLines.push(dataLines[i]);
+          i++;
+        }
+        rawEntries.push({ low, high, contentLines });
+        continue;
+      }
+
+      i++;
     }
 
     if (rawEntries.length === 0) {

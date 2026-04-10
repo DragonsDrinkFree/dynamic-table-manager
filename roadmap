@@ -1,14 +1,6 @@
+# Bugs
+D100 table parse should read "00" as "100". Currently drops the line.
 
+Make prefix absolute, no added : unless specified
 
-# Major
-
-- Table types:
-    - Standard Roll table
-    - Journal Page Builder.
-    - Better editor.
-
-
-
-# Issues
-
-- Css for multi table past needs cleaning up
+Table UUID access

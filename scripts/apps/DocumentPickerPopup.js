@@ -57,7 +57,7 @@ export class DocumentPickerPopup {
       <div class="dtm-doc-picker-search">
         <i class="fas fa-search"></i>
         <input type="text" class="dtm-doc-picker-input"
-          placeholder="Search... (@ for compendiums)"
+          placeholder="Search or paste UUID… (@ for compendiums)"
           autocomplete="off" spellcheck="false" />
       </div>
       <div class="dtm-doc-picker-hint">Type to search world documents</div>
@@ -163,7 +163,33 @@ export class DocumentPickerPopup {
       return this._searchPacks(packFilter, term);
     }
 
+    // UUID direct lookup: no spaces + contains "." → try fromUuid before name search.
+    // Matches world-doc format (RollTable.id) and compendium format (Compendium.pack.Type.id).
+    if (!query.includes(" ") && query.includes(".")) {
+      const uuidResult = await this._searchByUuid(query);
+      if (uuidResult) return [uuidResult];
+    }
+
     return this._searchWorld(query);
+  }
+
+  /**
+   * Attempt to resolve a query string as a UUID or Document.id shorthand.
+   * Returns a result object on success, null if the UUID cannot be resolved.
+   */
+  async _searchByUuid(query) {
+    try {
+      const doc = await fromUuid(query);
+      if (!doc) return null;
+      return {
+        name:    doc.name,
+        img:     doc.img ?? null,
+        uuid:    doc.uuid,
+        docType: doc.documentName ?? doc.constructor?.documentName ?? ""
+      };
+    } catch {
+      return null;
+    }
   }
 
   /** Return pack-hint items whose label includes filter. */

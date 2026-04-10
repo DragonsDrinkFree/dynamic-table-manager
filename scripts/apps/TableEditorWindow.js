@@ -71,7 +71,8 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       linkAll: TableEditorWindow.#onLinkAll,
       autoFormula:  TableEditorWindow.#onAutoFormula,
       detectLinks:  TableEditorWindow.#onDetectLinks,
-      changeAllTypes: TableEditorWindow.#onChangeAllTypes
+      changeAllTypes: TableEditorWindow.#onChangeAllTypes,
+      copyUuid:       TableEditorWindow.#onCopyUuid
     }
   };
 
@@ -283,7 +284,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     this.render();
   }
 
-  static async #onDeleteRow(event, target) {
+  static async #onDeleteRow(_event, target) {
     const rowId = target.closest("[data-result-id]")?.dataset.resultId;
     if (!rowId) return;
 
@@ -294,7 +295,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     this.render();
   }
 
-  static async #onEditDescription(event, target) {
+  static async #onEditDescription(_event, target) {
     const row = target.closest("[data-result-id]");
     const resultId = row?.dataset.resultId;
     if (!resultId) return;
@@ -302,40 +303,10 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const result = this.table.results.get(resultId);
     if (!result) return;
 
-    // Build a simple dialog with a textarea for the full description
-    const current = result.description ?? "";
-    const content = `
-      <div style="display:flex; flex-direction:column; gap:6px; padding:4px;">
-        <label style="font-size:11px; font-weight:bold; text-transform:uppercase; color:#999;">
-          Full Description for: <em>${result.name || "Untitled"}</em>
-        </label>
-        <textarea name="description" rows="10" style="width:100%; resize:vertical; font-size:13px; padding:6px; box-sizing:border-box;">${current}</textarea>
-      </div>`;
-
-    const value = await foundry.applications.api.DialogV2.wait({
-      window: { title: "Edit Description" },
-      content,
-      rejectClose: false,
-      buttons: [
-        {
-          action: "save",
-          label: "Save",
-          icon: "fas fa-save",
-          default: true,
-          callback: (_ev, _btn, dialog) =>
-            dialog.element.querySelector("[name='description']")?.value ?? ""
-        },
-        { action: "cancel", label: "Cancel", icon: "fas fa-times" }
-      ]
-    });
-
-    if (value === null || value === "cancel") return;
-    const before = this._getTableState();
-    await this.table.updateEmbeddedDocuments("TableResult", [{ _id: resultId, description: value }]);
-    this._recordUndo("editDescription", before);
+    result.sheet.render(true);
   }
 
-  static async #onOpenDocument(event, target) {
+  static async #onOpenDocument(_event, target) {
     const row = target.closest("[data-result-id]");
     const resultId = row?.dataset.resultId;
     if (!resultId) return;
@@ -526,7 +497,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
    * Change the type of every row to Text or Document.
    * If any rows have content, asks whether to keep or discard it first.
    */
-  static async #onChangeAllTypes(ev, btn) {
+  static async #onChangeAllTypes(_ev, btn) {
     const chosen = await this._showTypeMenu(btn);
     if (!chosen) return;
 
@@ -583,8 +554,15 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     this.render();
   }
 
+  static async #onCopyUuid() {
+    await game.clipboard.copyPlainText(this.table.uuid);
+    ui.notifications.info(game.i18n.format("DOCUMENT.IdCopied", {
+      label: this.table.name, type: "uuid", id: this.table.uuid
+    }));
+  }
 
-  static async #onToggleLink(event, target) {
+
+  static async #onToggleLink(_event, target) {
     const row = target.closest("[data-result-id]");
     const resultId = row?.dataset.resultId;
     if (!resultId) return;
@@ -640,8 +618,20 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
   // ---- Inline Editing ----
 
   /** @override */
-  _onRender(context, options) {
+  _onRender(_context, _options) {
     const html = this.element;
+
+    // Inject copy-UUID button directly onto the title bar (before the "..." overflow menu)
+    const toggleBtn = html.querySelector('.window-header [data-action="toggleControls"]');
+    if (toggleBtn && !html.querySelector('.window-header [data-action="copyUuid"]')) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "header-control fa-solid fa-passport icon";
+      btn.dataset.action = "copyUuid";
+      btn.dataset.tooltip = "Copy UUID";
+      btn.setAttribute("aria-label", "Copy UUID");
+      toggleBtn.before(btn);
+    }
 
     // Restore scroll position if a reorder just happened
     if (this._restoreScrollTop !== undefined) {
@@ -672,7 +662,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
     // Document picker: clicking the drop-target on Document-type rows
     html.querySelectorAll(".dtm-drop-target").forEach(dropTarget => {
-      dropTarget.addEventListener("click", ev => {
+      dropTarget.addEventListener("click", _ev => {
         const row = dropTarget.closest("[data-result-id]");
         if (!row) return;
         // Snapshot the rect now — element is definitely in the DOM during a click

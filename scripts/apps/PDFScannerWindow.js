@@ -417,7 +417,7 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
     const allTables = [];
     for (const region of withData) {
-      const tableName = prefix ? `${prefix}: ${region.name}` : region.name;
+      const tableName = prefix ? `${prefix}${region.name}` : region.name;
       if (region.parsed.isMultiColumn) {
         const tables = await TableCreator.createSplitTables(tableName, region.parsed, this.#folderId, makeCompound);
         allTables.push(...tables);
