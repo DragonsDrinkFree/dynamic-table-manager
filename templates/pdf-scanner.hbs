@@ -7,10 +7,27 @@
       <button type="button" data-action="selectPdf" class="dtm-btn-secondary">
         <i class="fas fa-folder-open"></i> Select PDF
       </button>
-      <button type="button" data-action="toggleSelect"
-              class="dtm-btn-secondary{{#if selectMode}} dtm-active{{/if}}"
-              {{#unless hasPdf}}disabled{{/unless}}>
-        <i class="fas fa-vector-square"></i> Select Tables
+      <button type="button" data-action="selectSingle"
+              class="dtm-btn-secondary{{#if isSelectSingle}} dtm-active{{/if}}"
+              {{#unless hasPdf}}disabled{{/unless}}
+              title="Draw a region around a single-column table. Handles tables printed across two page-columns (e.g. d100 split into two halves).">
+        <i class="fas fa-list-ol"></i> Single Col
+      </button>
+      <button type="button" data-action="selectMulti"
+              class="dtm-btn-secondary{{#if isSelectMulti}} dtm-active{{/if}}"
+              {{#unless hasPdf}}disabled{{/unless}}
+              title="Draw a region around a true multi-column data table (range + multiple data columns).">
+        <i class="fas fa-table-cells"></i> Multi Col
+      </button>
+      <button type="button" data-action="importRecipe" class="dtm-btn-secondary"
+              {{#unless hasPdf}}disabled{{/unless}}
+              title="Load a recipe JSON and re-scan its regions on this PDF">
+        <i class="fas fa-file-import"></i> Import Recipe
+      </button>
+      <button type="button" data-action="exportRecipe" class="dtm-btn-secondary"
+              {{#unless hasRegions}}disabled{{/unless}}
+              title="Save current regions + options as JSON (no table content)">
+        <i class="fas fa-file-export"></i> Export Recipe
       </button>
       {{#if hasPdf}}
       <div class="dtm-page-nav">
@@ -27,13 +44,14 @@
     </div>
 
     <input type="file" id="dtm-pdf-file-input" accept=".pdf" style="display:none">
+    <input type="file" id="dtm-recipe-file-input" accept="application/json,.json" style="display:none">
 
     <div class="dtm-canvas-wrapper">
       {{#unless hasPdf}}
       <div class="dtm-pdf-empty">
         <i class="fas fa-file-pdf"></i>
         <p>Click <strong>Select PDF</strong> to open a file.</p>
-        <p class="dtm-pdf-empty-hint">Then use <strong>Select Tables</strong> to draw regions over table content.</p>
+        <p class="dtm-pdf-empty-hint">Pick <strong>Single Col</strong> or <strong>Multi Col</strong>, then draw regions over table content.</p>
       </div>
       {{/unless}}
       <canvas id="dtm-pdf-canvas"></canvas>
@@ -54,6 +72,7 @@
       <div class="dtm-region-item{{#if this.isActive}} dtm-region-active{{/if}}"
            data-region-id="{{this.id}}">
         <input type="text" class="dtm-region-name" value="{{this.name}}" placeholder="Table name">
+        <span class="dtm-badge dtm-mode-badge dtm-mode-{{this.mode}}" title="Extraction mode">{{this.mode}}</span>
         <span class="dtm-badge dtm-page-badge">p.{{this.page}}</span>
         <span class="dtm-badge">{{this.entryCount}} rows</span>
         <button type="button" data-action="previewRegion" title="Preview / hide preview">

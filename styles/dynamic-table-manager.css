@@ -1112,6 +1112,20 @@ input.dtm-col-range:disabled {
   color: rgba(160, 200, 255, 0.8);
 }
 
+.dtm-mode-badge {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+.dtm-mode-single {
+  background: rgba(120, 200, 140, 0.18);
+  color: rgba(160, 230, 180, 0.9);
+}
+.dtm-mode-multi {
+  background: rgba(200, 160, 100, 0.18);
+  color: rgba(230, 200, 140, 0.9);
+}
+
 .dtm-region-list {
   flex: 1 1 0;
   overflow-y: auto;

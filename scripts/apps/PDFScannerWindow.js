@@ -15,9 +15,13 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
   #totalPages   = 0;
   #scale        = 1.5;
   #currentViewport = null; // pdf.js PageViewport, saved after each render
+  #pdfName         = null; // original File.name from the last Select PDF pick
 
   // ---- Selection state ----
-  #selectMode   = false;
+  // #selectMode: null = off, "single" | "multi" = drawing a region with that extraction mode.
+  // The mode is captured onto the region record at finalize time, so each region
+  // remembers how it should be re-extracted on import.
+  #selectMode   = null;
   #dragStart    = null;    // { x, y } in canvas buffer px
   #currentRect  = null;    // rubber-band rect in canvas buffer px
 
@@ -49,12 +53,15 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     position: { width: 940, height: 660 },
     actions: {
       selectPdf:     PDFScannerWindow.#onSelectPdf,
-      toggleSelect:  PDFScannerWindow.#onToggleSelect,
+      selectSingle:  PDFScannerWindow.#onSelectSingle,
+      selectMulti:   PDFScannerWindow.#onSelectMulti,
       prevPage:      PDFScannerWindow.#onPrevPage,
       nextPage:      PDFScannerWindow.#onNextPage,
       deleteRegion:  PDFScannerWindow.#onDeleteRegion,
       previewRegion: PDFScannerWindow.#onPreviewRegion,
       createTables:  PDFScannerWindow.#onCreateTables,
+      exportRecipe:  PDFScannerWindow.#onExportRecipe,
+      importRecipe:  PDFScannerWindow.#onImportRecipe,
       cancel:        PDFScannerWindow.#onCancel
     }
   };
@@ -74,11 +81,14 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       totalPages:  this.#totalPages,
       isFirstPage: this.#currentPage <= 1,
       isLastPage:  this.#currentPage >= this.#totalPages,
-      selectMode:  this.#selectMode,
+      selectMode:     this.#selectMode,
+      isSelectSingle: this.#selectMode === "single",
+      isSelectMulti:  this.#selectMode === "multi",
       regions: this.#regions.map(r => ({
         id:         r.id,
         name:       r.name,
         page:       r.page,
+        mode:       r.mode ?? "multi",
         isActive:   r.id === this.#activeRegionId,
         entryCount: r.parsed
           ? (r.parsed.isMultiColumn ? r.parsed.columns[0].entries.length : r.parsed.entries.length)
@@ -91,11 +101,11 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
         columns:       activeRegion.parsed?.isMultiColumn
           ? activeRegion.parsed.columns.map(c => ({
               header:  c.header,
-              entries: c.entries.slice(0, 10)
+              entries: c.entries
             }))
           : null,
         entries: !activeRegion.parsed?.isMultiColumn
-          ? (activeRegion.parsed?.entries ?? []).slice(0, 10)
+          ? (activeRegion.parsed?.entries ?? [])
           : null
       } : null,
       hasRegions:    this.#regions.length > 0,
@@ -303,17 +313,22 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
     const dpr     = window.devicePixelRatio || 1;
     const pdfRect = canvasRectToPdf(canvasRect, this.#currentViewport, dpr);
+    const mode    = this.#selectMode === "single" ? "single" : "multi";
 
-    const page    = await this.#pdfDoc.getPage(this.#currentPage);
-    const content = await page.getTextContent();
-    const parsed  = PDFTableExtractor.extract(content.items, pdfRect);
+    const parsed  = await this.#extractForRegion(this.#currentPage, pdfRect, mode);
 
     const id   = crypto.randomUUID();
     const name = `Table ${this.#regions.length + 1}`;
-    this.#regions.push({ id, page: this.#currentPage, rect: pdfRect, name, parsed });
+    this.#regions.push({ id, page: this.#currentPage, rect: pdfRect, name, mode, parsed });
 
     this.#activeRegionId = id;
     this.render();
+  }
+
+  async #extractForRegion(pageNum, pdfRect, mode = "multi") {
+    const page    = await this.#pdfDoc.getPage(pageNum);
+    const content = await page.getTextContent();
+    return PDFTableExtractor.extract(content.items, pdfRect, mode);
   }
 
   // ---- Coordinate transforms ----
@@ -340,6 +355,7 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     input.onchange = async (ev) => {
       const file = ev.target.files?.[0];
       if (!file) return;
+      this.#pdfName = file.name;
       const pdfjsLib = await PDFScannerWindow.#loadPdfJs();
       const buffer   = await file.arrayBuffer();
       this.#pdfDoc   = await pdfjsLib.getDocument({ data: buffer }).promise;
@@ -352,11 +368,23 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     input.click();
   }
 
-  static #onToggleSelect() {
-    this.#selectMode = !this.#selectMode;
+  static #onSelectSingle() {
+    this.#selectMode = this.#selectMode === "single" ? null : "single";
     this.#currentRect = null;
-    const btn = this.element.querySelector("[data-action='toggleSelect']");
-    btn?.classList.toggle("dtm-active", this.#selectMode);
+    this.#syncSelectButtons();
+  }
+
+  static #onSelectMulti() {
+    this.#selectMode = this.#selectMode === "multi" ? null : "multi";
+    this.#currentRect = null;
+    this.#syncSelectButtons();
+  }
+
+  #syncSelectButtons() {
+    const single = this.element.querySelector("[data-action='selectSingle']");
+    const multi  = this.element.querySelector("[data-action='selectMulti']");
+    single?.classList.toggle("dtm-active", this.#selectMode === "single");
+    multi?.classList.toggle("dtm-active", this.#selectMode === "multi");
     const overlay = this.element.querySelector("#dtm-select-canvas");
     if (overlay) overlay.style.cursor = this.#selectMode ? "crosshair" : "default";
   }
@@ -428,6 +456,122 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
     ui.notifications.info(`Created ${allTables.length} table(s) from PDF scan.`);
     this.close();
+  }
+
+  static async #onExportRecipe() {
+    if (this.#regions.length === 0) {
+      ui.notifications.warn("Draw at least one region before exporting.");
+      return;
+    }
+    const payload = {
+      schemaVersion: 1,
+      kind: "dtm-pdf-scan-recipe",
+      moduleVersion: game.modules.get("dynamic-table-manager")?.version ?? "unknown",
+      exportedAt: new Date().toISOString(),
+      note: "",
+      pdf: {
+        fingerprints: this.#pdfDoc?.fingerprints ?? [],
+        pdfName: this.#pdfName ?? null,
+        pageCount: this.#totalPages
+      },
+      options: {
+        usePrefix: this.#usePrefix,
+        tablePrefix: this.#tablePrefix,
+        makeCompound: this.#makeCompound
+      },
+      regions: this.#regions.map(r => ({
+        name: r.name,
+        page: r.page,
+        mode: r.mode ?? "multi",
+        rect: { x: r.rect.x, y: r.rect.y, w: r.rect.w, h: r.rect.h }
+      }))
+    };
+
+    const slug = (this.#pdfName || "untitled")
+      .replace(/\.pdf$/i, "")
+      .replace(/[^a-z0-9_-]+/gi, "_") || "untitled";
+    const filename = `dtm-pdf-recipe-${slug}.json`;
+    const json = JSON.stringify(payload, null, 2);
+
+    if (typeof foundry.utils.saveDataToFile === "function") {
+      foundry.utils.saveDataToFile(json, "application/json", filename);
+    } else {
+      const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+      const a = Object.assign(document.createElement("a"), { href: url, download: filename });
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+    ui.notifications.info(`Exported recipe with ${this.#regions.length} region(s).`);
+  }
+
+  static async #onImportRecipe() {
+    if (!this.#pdfDoc) {
+      ui.notifications.error("Load a PDF before importing a recipe.");
+      return;
+    }
+    const input = this.element.querySelector("#dtm-recipe-file-input");
+    if (!input) return;
+    input.onchange = async (ev) => {
+      const file = ev.target.files?.[0];
+      ev.target.value = "";
+      if (!file) return;
+
+      let recipe;
+      try { recipe = JSON.parse(await file.text()); }
+      catch { return ui.notifications.error("Recipe file is not valid JSON."); }
+
+      if (recipe?.kind !== "dtm-pdf-scan-recipe")
+        return ui.notifications.error("Not a PDF scan recipe file.");
+      if (recipe.schemaVersion !== 1)
+        return ui.notifications.error(`Unsupported recipe schema (v${recipe.schemaVersion}).`);
+      if (!Array.isArray(recipe.regions))
+        return ui.notifications.error("Recipe has no regions array.");
+
+      const bad = recipe.regions.findIndex(r =>
+        typeof r?.name !== "string" ||
+        !Number.isInteger(r?.page) || r.page < 1 ||
+        !r?.rect || ["x","y","w","h"].some(k => !Number.isFinite(r.rect[k]))
+      );
+      if (bad !== -1)
+        return ui.notifications.error(`Recipe region #${bad + 1} is malformed.`);
+
+      const loadedFps = (this.#pdfDoc.fingerprints ?? []).filter(Boolean);
+      const recipeFps = (recipe.pdf?.fingerprints ?? []).filter(Boolean);
+      const matches = recipeFps.some(f => loadedFps.includes(f));
+      if (recipeFps.length > 0 && !matches) {
+        const ok = await foundry.applications.api.DialogV2.confirm({
+          window: { title: "PDF Fingerprint Mismatch" },
+          content: `<p>This recipe was made from a different PDF file (fingerprint differs).</p>
+                    <p>Recipe PDF: <strong>${recipe.pdf?.pdfName ?? "(unknown)"}</strong></p>
+                    <p>If this is the same book from a different source, the regions may still line up. Proceed?</p>`,
+          rejectClose: false
+        });
+        if (!ok) return;
+      }
+
+      const inRange = recipe.regions.filter(r => r.page <= this.#totalPages);
+      const skipped = recipe.regions.length - inRange.length;
+
+      this.#regions = [];
+      this.#activeRegionId = null;
+      this.#usePrefix    = !!recipe.options?.usePrefix;
+      this.#tablePrefix  = String(recipe.options?.tablePrefix ?? "");
+      this.#makeCompound = recipe.options?.makeCompound !== false;
+
+      for (const r of inRange) {
+        const rect   = { x: +r.rect.x, y: +r.rect.y, w: +r.rect.w, h: +r.rect.h };
+        const mode   = r.mode === "single" ? "single" : "multi";
+        const parsed = await this.#extractForRegion(r.page, rect, mode);
+        this.#regions.push({ id: crypto.randomUUID(), page: r.page, rect, name: String(r.name), mode, parsed });
+      }
+
+      await this.render();
+
+      if (skipped > 0)
+        ui.notifications.warn(`${skipped} region(s) referenced pages beyond this PDF and were skipped.`);
+      ui.notifications.info(`Imported ${this.#regions.length} region(s).`);
+    };
+    input.click();
   }
 
   static #onCancel() { this.close(); }
