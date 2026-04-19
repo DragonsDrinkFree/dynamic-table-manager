@@ -29,6 +29,13 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
   #regions       = [];     // RegionRecord[]
   #activeRegionId = null;
 
+  // ---- Group state ----
+  // A "family" is an invisible container holding a shared roleTemplate and a list of "instances".
+  // Each region may link to an instance via instanceId + slotIndex, or be ungrouped (both null).
+  #families          = [];            // Family[]
+  #activeInstanceId  = null;          // string | null (null = Ungrouped draw target)
+  #expandedInstances = new Set();     // instance IDs that are expanded in the list
+
   // ---- Creation context ----
   #folderId      = null;
 
@@ -52,17 +59,23 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     window: { title: "Scan PDF", icon: "fas fa-file-pdf", resizable: true },
     position: { width: 940, height: 660 },
     actions: {
-      selectPdf:     PDFScannerWindow.#onSelectPdf,
-      selectSingle:  PDFScannerWindow.#onSelectSingle,
-      selectMulti:   PDFScannerWindow.#onSelectMulti,
-      prevPage:      PDFScannerWindow.#onPrevPage,
-      nextPage:      PDFScannerWindow.#onNextPage,
-      deleteRegion:  PDFScannerWindow.#onDeleteRegion,
-      previewRegion: PDFScannerWindow.#onPreviewRegion,
-      createTables:  PDFScannerWindow.#onCreateTables,
-      exportRecipe:  PDFScannerWindow.#onExportRecipe,
-      importRecipe:  PDFScannerWindow.#onImportRecipe,
-      cancel:        PDFScannerWindow.#onCancel
+      selectPdf:            PDFScannerWindow.#onSelectPdf,
+      selectSingle:         PDFScannerWindow.#onSelectSingle,
+      selectMulti:          PDFScannerWindow.#onSelectMulti,
+      prevPage:             PDFScannerWindow.#onPrevPage,
+      nextPage:             PDFScannerWindow.#onNextPage,
+      deleteRegion:         PDFScannerWindow.#onDeleteRegion,
+      previewRegion:        PDFScannerWindow.#onPreviewRegion,
+      createTables:         PDFScannerWindow.#onCreateTables,
+      exportRecipe:         PDFScannerWindow.#onExportRecipe,
+      importRecipe:         PDFScannerWindow.#onImportRecipe,
+      addPrefixGroup:       PDFScannerWindow.#onAddPrefixGroup,
+      newGroupInstance:     PDFScannerWindow.#onNewGroupInstance,
+      activateInstance:     PDFScannerWindow.#onActivateInstance,
+      toggleInstanceExpand: PDFScannerWindow.#onToggleInstanceExpand,
+      deleteInstance:       PDFScannerWindow.#onDeleteInstance,
+      activateUngrouped:    PDFScannerWindow.#onActivateUngrouped,
+      cancel:               PDFScannerWindow.#onCancel
     }
   };
 
@@ -75,6 +88,39 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
   /** @override */
   async _prepareContext() {
     const activeRegion = this.#regions.find(r => r.id === this.#activeRegionId) ?? null;
+
+    const regionView = (r) => ({
+      id:          r.id,
+      name:        this.#resolveRoleName(r),
+      page:        r.page,
+      mode:        r.mode ?? "multi",
+      isActive:    r.id === this.#activeRegionId,
+      entryCount:  r.parsed
+        ? (r.parsed.isMultiColumn ? r.parsed.columns[0].entries.length : r.parsed.entries.length)
+        : 0,
+      isOverride:  !!r.customName
+    });
+
+    const instances = [];
+    for (const family of this.#families) {
+      for (const instance of family.instances) {
+        const regions = this.#regions
+          .filter(r => r.instanceId === instance.id)
+          .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0))
+          .map(regionView);
+        instances.push({
+          id:         instance.id,
+          name:       instance.name,
+          isActive:   this.#activeInstanceId === instance.id,
+          isExpanded: this.#expandedInstances.has(instance.id),
+          regions
+        });
+      }
+    }
+    const ungroupedRegions = this.#regions
+      .filter(r => !r.instanceId)
+      .map(regionView);
+
     return {
       hasPdf:      !!this.#pdfDoc,
       currentPage: this.#currentPage,
@@ -84,19 +130,14 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       selectMode:     this.#selectMode,
       isSelectSingle: this.#selectMode === "single",
       isSelectMulti:  this.#selectMode === "multi",
-      regions: this.#regions.map(r => ({
-        id:         r.id,
-        name:       r.name,
-        page:       r.page,
-        mode:       r.mode ?? "multi",
-        isActive:   r.id === this.#activeRegionId,
-        entryCount: r.parsed
-          ? (r.parsed.isMultiColumn ? r.parsed.columns[0].entries.length : r.parsed.entries.length)
-          : 0
-      })),
+      hasFamilies:     this.#families.length > 0,
+      instances,
+      ungroupedRegions,
+      isUngroupedActive: this.#activeInstanceId === null,
+      totalRegionCount:  this.#regions.length,
       activeRegion: activeRegion ? {
-        id:           activeRegion.id,
-        name:         activeRegion.name,
+        id:            activeRegion.id,
+        name:          this.#resolveRoleName(activeRegion),
         isMultiColumn: activeRegion.parsed?.isMultiColumn ?? false,
         columns:       activeRegion.parsed?.isMultiColumn
           ? activeRegion.parsed.columns.map(c => ({
@@ -295,15 +336,94 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
   #attachRegionListeners() {
     const list = this.element?.querySelector(".dtm-region-list");
     if (!list) return;
-    list.addEventListener("change", (ev) => {
-      if (!ev.target.classList.contains("dtm-region-name")) return;
-      const id = ev.target.closest("[data-region-id]")?.dataset.regionId;
-      const region = this.#regions.find(r => r.id === id);
-      if (region) {
-        region.name = ev.target.value.trim() || region.name;
-        this.#redrawOverlay();
+    list.addEventListener("change", async (ev) => {
+      if (ev.target.classList.contains("dtm-region-name")) {
+        await this.#onRegionNameChange(ev.target);
+      } else if (ev.target.classList.contains("dtm-instance-name")) {
+        this.#onInstanceNameChange(ev.target);
       }
     });
+    // Prevent activate action from firing when user clicks the instance name input
+    list.addEventListener("click", (ev) => {
+      if (ev.target.classList.contains("dtm-instance-name")) ev.stopPropagation();
+    });
+  }
+
+  async #onRegionNameChange(input) {
+    const id = input.closest("[data-region-id]")?.dataset.regionId;
+    const region = this.#regions.find(r => r.id === id);
+    if (!region) return;
+    const newName = input.value.trim();
+    const prevDisplay = this.#resolveRoleName(region);
+
+    if (!newName || newName === prevDisplay) {
+      input.value = prevDisplay;
+      return;
+    }
+
+    if (!region.instanceId) {
+      region.name = newName;
+      this.#redrawOverlay();
+      return;
+    }
+
+    const info = this.#findInstance(region.instanceId);
+    if (!info) { input.value = prevDisplay; return; }
+
+    const peers = info.family.instances.filter(i => i.id !== info.instance.id).map(i => i.name);
+    const peersNote = peers.length
+      ? `<p>Other instances in this group: <strong>${peers.join(", ")}</strong>.</p>`
+      : "";
+
+    let choice;
+    try {
+      choice = await foundry.applications.api.DialogV2.wait({
+        window: { title: "Rename Role" },
+        content: `<p>Rename role from "<strong>${prevDisplay}</strong>" to "<strong>${newName}</strong>"?</p>
+                  ${peersNote}
+                  <p><em>Apply to all</em>: update the shared role template.<br>
+                  <em>Only this one</em>: keep the rename as an override on this region only.</p>`,
+        buttons: [
+          { action: "all",   label: "Apply to all",   default: true, callback: () => "all" },
+          { action: "one",   label: "Only this one",                 callback: () => "one" },
+          { action: "cancel", label: "Cancel",                       callback: () => "cancel" }
+        ],
+        rejectClose: false
+      });
+    } catch { choice = "cancel"; }
+
+    if (!choice || choice === "cancel") {
+      input.value = prevDisplay;
+      return;
+    }
+
+    if (choice === "all") {
+      info.family.roleTemplate[region.slotIndex] = newName;
+      for (const r of this.#regions) {
+        if (!r.instanceId) continue;
+        const rinfo = this.#findInstance(r.instanceId);
+        if (rinfo?.family.id === info.family.id && r.slotIndex === region.slotIndex) {
+          r.customName = null;
+          r.name = newName;
+        }
+      }
+    } else {
+      region.customName = newName;
+      region.name = newName;
+    }
+    this.#redrawOverlay();
+    this.render();
+  }
+
+  #onInstanceNameChange(input) {
+    const id = input.dataset.instanceId;
+    if (!id) return;
+    const info = this.#findInstance(id);
+    if (!info) return;
+    const newName = input.value.trim();
+    if (!newName) { input.value = info.instance.name; return; }
+    info.instance.name = newName;
+    // No cached-name update needed: role is unchanged; only prefix differs.
   }
 
   // ---- Region finalization ----
@@ -317,9 +437,30 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
     const parsed  = await this.#extractForRegion(this.#currentPage, pdfRect, mode);
 
-    const id   = crypto.randomUUID();
-    const name = `Table ${this.#regions.length + 1}`;
-    this.#regions.push({ id, page: this.#currentPage, rect: pdfRect, name, mode, parsed });
+    const id = crypto.randomUUID();
+
+    let instanceId = null;
+    let slotIndex  = null;
+    let name       = null;
+
+    if (this.#activeInstanceId) {
+      const info = this.#findInstance(this.#activeInstanceId);
+      if (info) {
+        instanceId = this.#activeInstanceId;
+        slotIndex  = this.#regionsInInstance(instanceId).length;
+        if (slotIndex >= info.family.roleTemplate.length) {
+          this.#extendRoleTemplate(info.family.id, slotIndex + 1);
+        }
+        name = info.family.roleTemplate[slotIndex];
+        this.#expandedInstances.add(instanceId);
+      }
+    }
+    if (name === null) name = `Table ${this.#regions.length + 1}`;
+
+    this.#regions.push({
+      id, page: this.#currentPage, rect: pdfRect, name, mode, parsed,
+      instanceId, slotIndex, customName: null
+    });
 
     this.#activeRegionId = id;
     this.render();
@@ -347,6 +488,78 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     };
   }
 
+  // ---- Group helpers ----
+
+  #findInstance(instanceId) {
+    if (!instanceId) return null;
+    for (const family of this.#families) {
+      const idx = family.instances.findIndex(i => i.id === instanceId);
+      if (idx !== -1) return { family, instance: family.instances[idx], indexInFamily: idx };
+    }
+    return null;
+  }
+
+  #regionsInInstance(instanceId) {
+    return this.#regions.filter(r => r.instanceId === instanceId);
+  }
+
+  #resolveRoleName(region) {
+    if (!region.instanceId) return region.name ?? "";
+    if (region.customName) return region.customName;
+    const info = this.#findInstance(region.instanceId);
+    const slot = region.slotIndex ?? 0;
+    return info?.family.roleTemplate[slot] ?? `Role ${slot + 1}`;
+  }
+
+  #buildTableName(region) {
+    const global = this.#usePrefix && this.#tablePrefix.trim()
+      ? this.#tablePrefix.trim() + " "
+      : "";
+    if (region.instanceId) {
+      const info = this.#findInstance(region.instanceId);
+      if (info) {
+        const role = region.customName
+          ?? info.family.roleTemplate[region.slotIndex]
+          ?? `Role ${(region.slotIndex ?? 0) + 1}`;
+        return `${global}${info.instance.name} ${role}`.trim();
+      }
+    }
+    return `${global}${region.name}`.trim();
+  }
+
+  #extendRoleTemplate(familyId, toLength) {
+    const family = this.#families.find(f => f.id === familyId);
+    if (!family) return;
+    while (family.roleTemplate.length < toLength) {
+      family.roleTemplate.push(`Role ${family.roleTemplate.length + 1}`);
+    }
+  }
+
+  async #promptForName({ title, message, placeholder = "", initial = "" }) {
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" })[c]);
+    const html = `
+      <div style="margin-bottom:8px">${esc(message)}</div>
+      <input type="text" name="dtm-group-name" placeholder="${esc(placeholder)}" value="${esc(initial)}" style="width:100%" autofocus>
+    `;
+    try {
+      const result = await foundry.applications.api.DialogV2.prompt({
+        window: { title },
+        content: html,
+        ok: {
+          label: "OK",
+          callback: (_event, button) => {
+            const input = button.form?.elements?.["dtm-group-name"];
+            return input?.value?.trim() || null;
+          }
+        },
+        rejectClose: false
+      });
+      return result || null;
+    } catch {
+      return null;
+    }
+  }
+
   // ---- Actions ----
 
   static async #onSelectPdf() {
@@ -363,6 +576,9 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       this.#currentPage = 1;
       this.#regions     = [];
       this.#activeRegionId = null;
+      this.#families = [];
+      this.#activeInstanceId = null;
+      this.#expandedInstances = new Set();
       await this.render();
     };
     input.click();
@@ -412,10 +628,63 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     this.element.querySelector("[data-action='nextPage']")?.toggleAttribute("disabled", this.#currentPage >= this.#totalPages);
   }
 
-  static #onDeleteRegion(event, target) {
+  static async #onDeleteRegion(event, target) {
     const id = target.closest("[data-region-id]")?.dataset.regionId;
     if (!id) return;
-    this.#regions = this.#regions.filter(r => r.id !== id);
+    const region = this.#regions.find(r => r.id === id);
+    if (!region) return;
+
+    if (region.instanceId) {
+      const info = this.#findInstance(region.instanceId);
+      const roleName = this.#resolveRoleName(region);
+      let choice;
+      try {
+        choice = await foundry.applications.api.DialogV2.wait({
+          window: { title: "Delete Region" },
+          content: `<p>Delete region "<strong>${roleName}</strong>" from instance "<strong>${info?.instance.name ?? "?"}</strong>".</p>
+                    <p>Also remove role "<strong>${roleName}</strong>" from the shared role template (applies to all instances in this group)?</p>`,
+          buttons: [
+            { action: "region",  label: "Delete region only",    default: true, callback: () => "region" },
+            { action: "cascade", label: "Delete region + role",                 callback: () => "cascade" },
+            { action: "cancel",  label: "Cancel",                               callback: () => "cancel" }
+          ],
+          rejectClose: false
+        });
+      } catch { choice = "cancel"; }
+      if (!choice || choice === "cancel") return;
+
+      if (choice === "cascade" && info) {
+        const removedSlot = region.slotIndex;
+        info.family.roleTemplate.splice(removedSlot, 1);
+        // Delete target region AND any peer regions at the same slot (the role is gone)
+        this.#regions = this.#regions.filter(r => {
+          if (r.id === id) return false;
+          if (!r.instanceId) return true;
+          const rinfo = this.#findInstance(r.instanceId);
+          if (rinfo?.family.id === info.family.id && r.slotIndex === removedSlot) return false;
+          return true;
+        });
+        // Decrement slotIndex on remaining regions of the family with higher index
+        for (const r of this.#regions) {
+          if (!r.instanceId) continue;
+          const rinfo = this.#findInstance(r.instanceId);
+          if (rinfo?.family.id === info.family.id && r.slotIndex > removedSlot) {
+            r.slotIndex--;
+          }
+        }
+        // Refresh cached names for the family
+        for (const r of this.#regions) {
+          if (!r.instanceId) continue;
+          const rinfo = this.#findInstance(r.instanceId);
+          if (rinfo?.family.id === info.family.id) r.name = this.#resolveRoleName(r);
+        }
+      } else {
+        this.#regions = this.#regions.filter(r => r.id !== id);
+      }
+    } else {
+      this.#regions = this.#regions.filter(r => r.id !== id);
+    }
+
     if (this.#activeRegionId === id) this.#activeRegionId = null;
     this.#redrawOverlay();
     this.render();
@@ -440,12 +709,11 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     const skipped = this.#regions.length - withData.length;
     if (skipped > 0) ui.notifications.warn(`${skipped} region(s) had no data and were skipped.`);
 
-    const prefix       = this.#usePrefix ? (this.#tablePrefix.trim() || "") : "";
     const makeCompound = this.#makeCompound;
 
     const allTables = [];
     for (const region of withData) {
-      const tableName = prefix ? `${prefix}${region.name}` : region.name;
+      const tableName = this.#buildTableName(region);
       if (region.parsed.isMultiColumn) {
         const tables = await TableCreator.createSplitTables(tableName, region.parsed, this.#folderId, makeCompound);
         allTables.push(...tables);
@@ -458,13 +726,104 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     this.close();
   }
 
+  // ---- Group actions ----
+
+  static async #onAddPrefixGroup() {
+    const name = await this.#promptForName({
+      title: "New Prefix Group",
+      message: "Name the first instance of this group (e.g. Elf, Human, Fighter). You can add more instances later that share the same role names.",
+      placeholder: "Elf"
+    });
+    if (!name) return;
+    const instance = { id: crypto.randomUUID(), name };
+    const family = { id: crypto.randomUUID(), roleTemplate: [], instances: [instance] };
+    this.#families.push(family);
+    this.#activeInstanceId = instance.id;
+    this.#expandedInstances.add(instance.id);
+    this.render();
+  }
+
+  static async #onNewGroupInstance() {
+    let targetFamily = null;
+    if (this.#activeInstanceId) {
+      targetFamily = this.#findInstance(this.#activeInstanceId)?.family ?? null;
+    }
+    if (!targetFamily) targetFamily = this.#families[this.#families.length - 1] ?? null;
+    if (!targetFamily) {
+      ui.notifications.warn("Create a Prefix Group first.");
+      return;
+    }
+    const peerNames = targetFamily.instances.map(i => i.name).join(", ");
+    const name = await this.#promptForName({
+      title: "New Group Instance",
+      message: `Add a new instance sharing roles with: ${peerNames}.`,
+      placeholder: "Dwarf"
+    });
+    if (!name) return;
+    const instance = { id: crypto.randomUUID(), name };
+    targetFamily.instances.push(instance);
+    this.#activeInstanceId = instance.id;
+    this.#expandedInstances.add(instance.id);
+    this.render();
+  }
+
+  static #onActivateInstance(event, target) {
+    const id = target.closest("[data-instance-id]")?.dataset.instanceId;
+    if (!id) return;
+    this.#activeInstanceId = this.#activeInstanceId === id ? null : id;
+    this.#expandedInstances.add(id);
+    this.render();
+  }
+
+  static #onToggleInstanceExpand(event, target) {
+    event.stopPropagation?.();
+    const id = target.closest("[data-instance-id]")?.dataset.instanceId;
+    if (!id) return;
+    if (this.#expandedInstances.has(id)) this.#expandedInstances.delete(id);
+    else this.#expandedInstances.add(id);
+    this.render();
+  }
+
+  static async #onDeleteInstance(event, target) {
+    event.stopPropagation?.();
+    const id = target.closest("[data-instance-id]")?.dataset.instanceId;
+    if (!id) return;
+    const info = this.#findInstance(id);
+    if (!info) return;
+    const regionCount = this.#regionsInInstance(id).length;
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "Delete Instance" },
+      content: `<p>Delete instance "<strong>${info.instance.name}</strong>" and its <strong>${regionCount}</strong> region(s)?</p>`,
+      rejectClose: false
+    });
+    if (!ok) return;
+
+    this.#regions = this.#regions.filter(r => r.instanceId !== id);
+    if (this.#activeRegionId && !this.#regions.find(r => r.id === this.#activeRegionId)) {
+      this.#activeRegionId = null;
+    }
+    info.family.instances = info.family.instances.filter(i => i.id !== id);
+    if (info.family.instances.length === 0) {
+      this.#families = this.#families.filter(f => f.id !== info.family.id);
+    }
+    if (this.#activeInstanceId === id) this.#activeInstanceId = null;
+    this.#expandedInstances.delete(id);
+    this.#redrawOverlay();
+    this.render();
+  }
+
+  static #onActivateUngrouped() {
+    this.#activeInstanceId = null;
+    this.render();
+  }
+
   static async #onExportRecipe() {
     if (this.#regions.length === 0) {
       ui.notifications.warn("Draw at least one region before exporting.");
       return;
     }
     const payload = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: "dtm-pdf-scan-recipe",
       moduleVersion: game.modules.get("dynamic-table-manager")?.version ?? "unknown",
       exportedAt: new Date().toISOString(),
@@ -479,11 +838,19 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
         tablePrefix: this.#tablePrefix,
         makeCompound: this.#makeCompound
       },
+      families: this.#families.map(f => ({
+        id: f.id,
+        roleTemplate: [...f.roleTemplate],
+        instances: f.instances.map(i => ({ id: i.id, name: i.name }))
+      })),
       regions: this.#regions.map(r => ({
         name: r.name,
         page: r.page,
         mode: r.mode ?? "multi",
-        rect: { x: r.rect.x, y: r.rect.y, w: r.rect.w, h: r.rect.h }
+        rect: { x: r.rect.x, y: r.rect.y, w: r.rect.w, h: r.rect.h },
+        instanceId: r.instanceId ?? null,
+        slotIndex: Number.isInteger(r.slotIndex) ? r.slotIndex : null,
+        customName: r.customName ?? null
       }))
     };
 
@@ -522,8 +889,9 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
       if (recipe?.kind !== "dtm-pdf-scan-recipe")
         return ui.notifications.error("Not a PDF scan recipe file.");
-      if (recipe.schemaVersion !== 1)
-        return ui.notifications.error(`Unsupported recipe schema (v${recipe.schemaVersion}).`);
+      const schema = recipe.schemaVersion;
+      if (schema !== 1 && schema !== 2)
+        return ui.notifications.error(`Unsupported recipe schema (v${schema}).`);
       if (!Array.isArray(recipe.regions))
         return ui.notifications.error("Recipe has no regions array.");
 
@@ -534,6 +902,38 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       );
       if (bad !== -1)
         return ui.notifications.error(`Recipe region #${bad + 1} is malformed.`);
+
+      // v2: validate families + build ID remap
+      let newFamilies = [];
+      const instanceIdMap = new Map();
+      if (schema === 2) {
+        if (!Array.isArray(recipe.families))
+          return ui.notifications.error("Recipe is missing families array.");
+        for (let fi = 0; fi < recipe.families.length; fi++) {
+          const f = recipe.families[fi];
+          if (!f || !Array.isArray(f.roleTemplate) || !f.roleTemplate.every(s => typeof s === "string")
+              || !Array.isArray(f.instances) || !f.instances.every(i => i?.id && typeof i?.name === "string")) {
+            return ui.notifications.error(`Recipe family #${fi + 1} is malformed.`);
+          }
+        }
+        newFamilies = recipe.families.map(f => {
+          const newInstances = f.instances.map(i => {
+            const newId = crypto.randomUUID();
+            instanceIdMap.set(i.id, newId);
+            return { id: newId, name: String(i.name) };
+          });
+          return { id: crypto.randomUUID(), roleTemplate: f.roleTemplate.map(String), instances: newInstances };
+        });
+        for (let i = 0; i < recipe.regions.length; i++) {
+          const r = recipe.regions[i];
+          if (r.instanceId != null) {
+            if (!instanceIdMap.has(r.instanceId))
+              return ui.notifications.error(`Recipe region #${i + 1} references an unknown instance.`);
+            if (!Number.isInteger(r.slotIndex) || r.slotIndex < 0)
+              return ui.notifications.error(`Recipe region #${i + 1} has an invalid slotIndex.`);
+          }
+        }
+      }
 
       const loadedFps = (this.#pdfDoc.fingerprints ?? []).filter(Boolean);
       const recipeFps = (recipe.pdf?.fingerprints ?? []).filter(Boolean);
@@ -554,6 +954,9 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
       this.#regions = [];
       this.#activeRegionId = null;
+      this.#families = newFamilies;
+      this.#activeInstanceId = null;
+      this.#expandedInstances = new Set();
       this.#usePrefix    = !!recipe.options?.usePrefix;
       this.#tablePrefix  = String(recipe.options?.tablePrefix ?? "");
       this.#makeCompound = recipe.options?.makeCompound !== false;
@@ -562,14 +965,20 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
         const rect   = { x: +r.rect.x, y: +r.rect.y, w: +r.rect.w, h: +r.rect.h };
         const mode   = r.mode === "single" ? "single" : "multi";
         const parsed = await this.#extractForRegion(r.page, rect, mode);
-        this.#regions.push({ id: crypto.randomUUID(), page: r.page, rect, name: String(r.name), mode, parsed });
+        const instanceId = (schema === 2 && r.instanceId != null) ? instanceIdMap.get(r.instanceId) : null;
+        const slotIndex  = (instanceId != null && Number.isInteger(r.slotIndex)) ? r.slotIndex : null;
+        const customName = (schema === 2 && r.customName != null) ? String(r.customName) : null;
+        this.#regions.push({
+          id: crypto.randomUUID(), page: r.page, rect, name: String(r.name), mode, parsed,
+          instanceId, slotIndex, customName
+        });
       }
 
       await this.render();
 
       if (skipped > 0)
         ui.notifications.warn(`${skipped} region(s) referenced pages beyond this PDF and were skipped.`);
-      ui.notifications.info(`Imported ${this.#regions.length} region(s).`);
+      ui.notifications.info(`Imported ${this.#regions.length} region(s)${schema === 2 ? ` into ${newFamilies.reduce((n,f)=>n+f.instances.length,0)} instance(s)` : ""}.`);
     };
     input.click();
   }
