@@ -6,6 +6,16 @@ import { PasteTableParser } from "./PasteTableParser.js";
  *
  * Output is shape-compatible with PasteTableParser.parse() so it can
  * be fed directly into TableCreator methods.
+ *
+ * Two modes:
+ *   "single" — one conceptual table; region may span multiple visual
+ *              columns (e.g. d100 Trinket printed in two page-columns).
+ *              Detects flow-column layout and pairs every range with
+ *              its adjacent content cell. Always returns a single-column
+ *              result (isMultiColumn: false).
+ *
+ *   "multi"  — region covers a true multi-column data table (range + N
+ *              data columns). Returns isMultiColumn: true when contentCols >= 2.
  */
 export class PDFTableExtractor {
 
@@ -24,18 +34,35 @@ export class PDFTableExtractor {
    * @param {object[]} textItems  — pdf.js TextItem[] from page.getTextContent().items
    * @param {{ x: number, y: number, w: number, h: number }} rect
    *   Rectangle in PDF user units, bottom-left origin (Y increases upward)
+   * @param {"single"|"multi"} [mode="multi"]  Extraction mode
    * @returns {{ formula: string, isMultiColumn: boolean, entries?: [], columns?: [] }}
    */
-  static extract(textItems, rect) {
+  static extract(textItems, rect, mode = "multi") {
+    if (mode === "single") {
+      return PDFTableExtractor.#extractSingle(textItems, rect);
+    }
+    const prep = PDFTableExtractor.#prepareGrid(textItems, rect);
+    if (!prep) return { formula: "", isMultiColumn: false, entries: [] };
+    const { grid, firstColIsRange, colCount } = prep;
+    return PDFTableExtractor.#extractMulti(grid, firstColIsRange, colCount);
+  }
+
+  // ---- Shared preparation pipeline ----
+
+  /**
+   * Filter → row-cluster → continuation-merge → band-detect → grid-build → post-process.
+   * Returns { grid, firstColIsRange, colCount } or null if no data.
+   */
+  static #prepareGrid(textItems, rect) {
     const filtered = PDFTableExtractor.#filterItems(textItems, rect);
-    if (filtered.length === 0) return { formula: "", isMultiColumn: false, entries: [] };
+    if (filtered.length === 0) return null;
 
     const allRows = PDFTableExtractor.#clusterRows(filtered);
-    if (allRows.length === 0) return { formula: "", isMultiColumn: false, entries: [] };
+    if (allRows.length === 0) return null;
 
-    // Identify data rows: rows whose leftmost item starts with a number (the range column).
-    // Continuation rows (wrapped content with no range number) are merged into their parent
-    // row so that wrapped cell text is not lost.
+    // Identify data rows: rows whose leftmost item starts with a number.
+    // Continuation rows (wrapped content with no range number) are merged into
+    // their parent row so wrapped cell text is preserved.
     const dataRows = [];
     let currentGroup = null;
     for (const rowItems of allRows) {
@@ -45,25 +72,16 @@ export class PDFTableExtractor {
         currentGroup = [...rowItems];
         dataRows.push(currentGroup);
       } else if (currentGroup !== null) {
-        // Continuation line — absorb its items into the current numbered row.
-        // #buildCellGrid assigns items to columns by X position, so text lands
-        // in the correct column and is joined with its siblings automatically.
         currentGroup.push(...rowItems);
       }
-      // Non-numbered rows before the first numbered row are headers — skip them.
     }
 
-    // Use numeric-first rows for column detection when available; otherwise fall back.
     const hasRangeCol = dataRows.length >= 2;
     const rows = hasRangeCol ? dataRows : allRows;
 
-    // Detect columns via band clustering — groups nearby X positions into bands,
-    // then treats gaps between bands as column dividers.  This is more robust than
-    // raw gap detection, which breaks when content items have slight X variations.
     const bands = PDFTableExtractor.#detectColumnBands(rows);
     const colCount = bands.length;
 
-    // Column boundaries are midpoints between adjacent band edges
     const boundaries = [];
     for (let i = 1; i < bands.length; i++) {
       boundaries.push((bands[i - 1].xMax + bands[i].xMin) / 2);
@@ -71,8 +89,7 @@ export class PDFTableExtractor {
 
     const grid = PDFTableExtractor.#buildCellGrid(rows, boundaries)
       .filter(row => row.some(cell => cell.trim() !== ""));
-
-    if (grid.length === 0) return { formula: "", isMultiColumn: false, entries: [] };
+    if (grid.length === 0) return null;
 
     // Post-process: PDF right-aligned number columns can split multi-digit numbers
     // across glyphs in two ways:
@@ -82,11 +99,9 @@ export class PDFTableExtractor {
     if (hasRangeCol && colCount >= 2) {
       for (const row of grid) {
         const rangeCell = row[0]?.trim() ?? "";
-        // Case (a): "1 1", "1 2" etc — digits separated only by spaces → collapse
         if (/^\d[\d ]+$/.test(rangeCell) && !PasteTableParser.NUMBER_LINE.test(rangeCell)) {
           row[0] = rangeCell.replace(/\s+/g, "");
         }
-        // Case (b): single digit in range cell, content cell starts with digit(s) + space
         if (/^\d$/.test(row[0]?.trim() ?? "")) {
           const contentCell = row[1]?.trim() ?? "";
           const m = contentCell.match(/^(\d+)\s+([\s\S]+)/);
@@ -98,58 +113,130 @@ export class PDFTableExtractor {
       }
     }
 
-    // First column is the range column when we pre-filtered to numeric-first rows
-    // AND the grid confirms those cells are purely numeric.
     const firstColIsRange = hasRangeCol && grid.every(row => {
       const token = (row[0]?.trim() ?? "").split(/\s+/)[0].replace(/[.):\]]+$/, "");
       return PasteTableParser.NUMBER_LINE.test(token);
     });
 
-    const contentCols = colCount - (firstColIsRange ? 1 : 0);
+    return { grid, firstColIsRange, colCount };
+  }
 
-    // --- Side-by-side layout detection ---
-    // e.g. [range, content, range, content] — one table printed in two visual columns.
-    // Detected when contentCols >= 2 and the second content column also contains only range values.
-    if (firstColIsRange && contentCols >= 2) {
-      const secondRangeIdx = 2; // col 0=range, col 1=content, col 2=potential second range
-      const secondColIsRange = grid.every(row => {
-        const token = (row[secondRangeIdx]?.trim() ?? "").split(/\s+/)[0].replace(/[.):\]]+$/, "");
-        return token !== "" && PasteTableParser.NUMBER_LINE.test(token);
-      });
+  // ---- Single-column mode ----
 
-      if (secondColIsRange) {
-        const entries = [];
-        for (const row of grid) {
-          const lRange = row[0]?.trim().replace(/[.):\]]+$/, "") ?? "";
-          const lm = lRange.match(PasteTableParser.NUMBER_LINE);
-          if (lm) {
-            const lLow  = parseInt(lm[1] ?? lm[3]);
-            const lHigh = lm[2] !== undefined ? PDFTableExtractor.#d100Fix(parseInt(lm[2]), lLow) : lLow;
-            const lName = row[1]?.trim() ?? "";
-            if (lName) entries.push({ low: lLow, high: lHigh, name: lName });
-          }
-          const rRange = row[secondRangeIdx]?.trim().replace(/[.):\]]+$/, "") ?? "";
-          const rm = rRange.match(PasteTableParser.NUMBER_LINE);
-          if (rm) {
-            const rLow  = parseInt(rm[1] ?? rm[3]);
-            const rHigh = rm[2] !== undefined ? PDFTableExtractor.#d100Fix(parseInt(rm[2]), rLow) : rLow;
-            const rName = row[3]?.trim() ?? "";
-            if (rName) entries.push({ low: rLow, high: rHigh, name: rName });
-          }
+  /** Gap between range-token X clusters that separates flow columns (PDF user units). */
+  static FLOW_COL_GAP = 50;
+
+  /**
+   * Single-column extraction. Scans text items in reading order, grouping each
+   * range token with the content items that follow it *in the same flow column*.
+   *
+   * Why item-level instead of grid-based: PDF tables often have the range number
+   * and first content word only ~30 pt apart — tighter than the band detector's
+   * gap threshold. A grid would merge them into a single cell where the range
+   * token is no longer at the start, breaking range parsing. Item-level scan
+   * reads each text-item's X position directly, so spacing is irrelevant.
+   *
+   * Flow-column detection: collect X positions of every item that starts with
+   * a range token. Large gaps (> FLOW_COL_GAP) separate visual page-columns
+   * (e.g. d100 Trinket printed in two side-by-side halves).
+   */
+  static #extractSingle(textItems, rect) {
+    const filtered = PDFTableExtractor.#filterItems(textItems, rect);
+    if (filtered.length === 0) return { formula: "", isMultiColumn: false, entries: [] };
+
+    const rows = PDFTableExtractor.#clusterRows(filtered);
+    if (rows.length === 0) return { formula: "", isMultiColumn: false, entries: [] };
+
+    // Collect X positions of items whose first whitespace-separated token is a range.
+    const rangeXs = [];
+    for (const rowItems of rows) {
+      for (const item of rowItems) {
+        const trimmed = item.str?.trim() ?? "";
+        if (!trimmed) continue;
+        const firstTok = trimmed.split(/\s+/)[0].replace(/[.):\]]+$/, "");
+        if (PasteTableParser.NUMBER_LINE.test(firstTok)) {
+          rangeXs.push(item.transform[4]);
         }
-        entries.sort((a, b) => a.low - b.low);
-        return { formula: "", isMultiColumn: false, entries: entries.filter(e => e.name) };
+      }
+    }
+    if (rangeXs.length === 0) return { formula: "", isMultiColumn: false, entries: [] };
+
+    // Cluster range X positions into flow columns.
+    rangeXs.sort((a, b) => a - b);
+    const flowCols = [{ xMin: rangeXs[0], xMax: rangeXs[0] }];
+    for (let i = 1; i < rangeXs.length; i++) {
+      const last = flowCols[flowCols.length - 1];
+      if (rangeXs[i] - last.xMax > PDFTableExtractor.FLOW_COL_GAP) {
+        flowCols.push({ xMin: rangeXs[i], xMax: rangeXs[i] });
+      } else {
+        last.xMax = rangeXs[i];
       }
     }
 
-    // --- Single content column path ---
+    // Boundaries = midpoints between adjacent flow-column edges.
+    const boundaries = [];
+    for (let i = 1; i < flowCols.length; i++) {
+      boundaries.push((flowCols[i - 1].xMax + flowCols[i].xMin) / 2);
+    }
+    const classify = x => {
+      for (let i = 0; i < boundaries.length; i++) if (x < boundaries[i]) return i;
+      return boundaries.length;
+    };
+
+    // Walk items row-by-row, left-to-right within each row. Each flow column
+    // maintains its own "current pair" so wrapped content attaches to the right
+    // entry regardless of which column has items on the current Y line.
+    const current = Array(flowCols.length).fill(null);
+    const entries = [];
+
+    const commit = (p) => {
+      if (!p) return;
+      const m = p.range.match(PasteTableParser.NUMBER_LINE);
+      if (!m) return;
+      const low  = parseInt(m[1] ?? m[3]);
+      const high = m[2] !== undefined ? PDFTableExtractor.#d100Fix(parseInt(m[2]), low) : low;
+      const name = p.content.join(" ").trim();
+      if (name) entries.push({ low, high, name });
+    };
+
+    for (const rowItems of rows) {
+      for (const item of rowItems) {
+        const str = item.str?.trim() ?? "";
+        if (!str) continue;
+        const col = classify(item.transform[4]);
+        const firstTok = str.split(/\s+/)[0].replace(/[.):\]]+$/, "");
+        if (PasteTableParser.NUMBER_LINE.test(firstTok)) {
+          commit(current[col]);
+          const remainder = str.slice(str.indexOf(firstTok) + firstTok.length).replace(/^[.):\]]+/, "").trim();
+          current[col] = { range: firstTok, content: remainder ? [remainder] : [] };
+        } else if (current[col]) {
+          current[col].content.push(str);
+        }
+      }
+    }
+    for (const p of current) commit(p);
+
+    entries.sort((a, b) => a.low - b.low);
+    return { formula: "", isMultiColumn: false, entries };
+  }
+
+  // ---- Multi-column mode ----
+
+  /**
+   * Multi-column extraction. User has explicitly declared this region is a
+   * true multi-column data table (range + N data columns). No side-by-side
+   * auto-detection here — single-column mode is the tool for that case.
+   */
+  static #extractMulti(grid, firstColIsRange, colCount) {
+    const contentCols = colCount - (firstColIsRange ? 1 : 0);
+
+    // Single content column path
     if (contentCols <= 1) {
       let seq = 0;
       const entries = grid.map(row => {
         let low, high, name;
 
         if (firstColIsRange && colCount >= 2) {
-          // Separate range column and content column
           const rangeText = row[0]?.trim().replace(/[.):\]]+$/, "") ?? "";
           const m = rangeText.match(PasteTableParser.NUMBER_LINE);
           low  = m ? parseInt(m[1] ?? m[3]) : ++seq;
@@ -157,7 +244,6 @@ export class PDFTableExtractor {
           name = row[1]?.trim() ?? "";
 
         } else if (firstColIsRange && colCount === 1) {
-          // Range number and content merged into one cell ("1 Dragon Fire")
           const cell = row[0]?.trim() ?? "";
           const splitM = cell.match(/^(-?\d+(?:\s*[-–]\s*-?\d+)?)[.):\]]?\s+([\s\S]+)/);
           if (splitM) {
@@ -181,7 +267,7 @@ export class PDFTableExtractor {
       return { formula: "", isMultiColumn: false, entries };
     }
 
-    // --- Multi-column path ---
+    // Multi content column path
     const startCol = firstColIsRange ? 1 : 0;
     const columns = Array.from({ length: contentCols }, (_, i) => ({
       header: `Column ${i + 1}`,
@@ -195,7 +281,7 @@ export class PDFTableExtractor {
         const rangeText = row[0]?.trim().replace(/[.):\]]+$/, "") ?? "";
         const m = rangeText.match(PasteTableParser.NUMBER_LINE);
         low  = m ? parseInt(m[1] ?? m[3]) : ++seq;
-        high = m?.[2] !== undefined ? parseInt(m[2]) : low;
+        high = m?.[2] !== undefined ? PDFTableExtractor.#d100Fix(parseInt(m[2]), low) : low;
       } else {
         low = high = ++seq;
       }
@@ -234,7 +320,6 @@ export class PDFTableExtractor {
     const rows = [];
     for (const item of sorted) {
       const y = item.transform[5];
-      // Assign to the nearest existing row within tolerance (not just the last)
       let best = null, bestDist = Infinity;
       for (const row of rows) {
         const dist = Math.abs(y - row._meanY);
@@ -265,7 +350,6 @@ export class PDFTableExtractor {
     allX.sort((a, b) => a - b);
     if (allX.length === 0) return [{ xMin: 0, xMax: 0, center: 0 }];
 
-    // Step 1: cluster into tight bands (items within COL_BAND_TOLERANCE = same band)
     const rawBands = [];
     let band = [allX[0]];
     for (let i = 1; i < allX.length; i++) {
@@ -284,7 +368,6 @@ export class PDFTableExtractor {
       center: arr.reduce((s, x) => s + x, 0) / arr.length
     });
 
-    // Step 2: merge bands whose gap is less than COL_GAP_THRESHOLD
     const merged = [toBand(rawBands[0])];
     for (let i = 1; i < rawBands.length; i++) {
       const prev = merged[merged.length - 1];
@@ -292,7 +375,6 @@ export class PDFTableExtractor {
       if (curr.xMin - prev.xMax > PDFTableExtractor.COL_GAP_THRESHOLD) {
         merged.push(curr);
       } else {
-        // Absorb curr into prev by extending the range
         prev.xMax = curr.xMax;
         prev.center = (prev.xMin + prev.xMax) / 2;
       }

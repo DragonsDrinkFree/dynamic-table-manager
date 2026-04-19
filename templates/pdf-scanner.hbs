@@ -7,10 +7,27 @@
       <button type="button" data-action="selectPdf" class="dtm-btn-secondary">
         <i class="fas fa-folder-open"></i> Select PDF
       </button>
-      <button type="button" data-action="toggleSelect"
-              class="dtm-btn-secondary{{#if selectMode}} dtm-active{{/if}}"
-              {{#unless hasPdf}}disabled{{/unless}}>
-        <i class="fas fa-vector-square"></i> Select Tables
+      <button type="button" data-action="selectSingle"
+              class="dtm-btn-secondary{{#if isSelectSingle}} dtm-active{{/if}}"
+              {{#unless hasPdf}}disabled{{/unless}}
+              title="Draw a region around a single-column table. Handles tables printed across two page-columns (e.g. d100 split into two halves).">
+        <i class="fas fa-list-ol"></i> Single Col
+      </button>
+      <button type="button" data-action="selectMulti"
+              class="dtm-btn-secondary{{#if isSelectMulti}} dtm-active{{/if}}"
+              {{#unless hasPdf}}disabled{{/unless}}
+              title="Draw a region around a true multi-column data table (range + multiple data columns).">
+        <i class="fas fa-table-cells"></i> Multi Col
+      </button>
+      <button type="button" data-action="importRecipe" class="dtm-btn-secondary"
+              {{#unless hasPdf}}disabled{{/unless}}
+              title="Load a recipe JSON and re-scan its regions on this PDF">
+        <i class="fas fa-file-import"></i> Import Recipe
+      </button>
+      <button type="button" data-action="exportRecipe" class="dtm-btn-secondary"
+              {{#unless hasRegions}}disabled{{/unless}}
+              title="Save current regions + options as JSON (no table content)">
+        <i class="fas fa-file-export"></i> Export Recipe
       </button>
       {{#if hasPdf}}
       <div class="dtm-page-nav">
@@ -27,13 +44,14 @@
     </div>
 
     <input type="file" id="dtm-pdf-file-input" accept=".pdf" style="display:none">
+    <input type="file" id="dtm-recipe-file-input" accept="application/json,.json" style="display:none">
 
     <div class="dtm-canvas-wrapper">
       {{#unless hasPdf}}
       <div class="dtm-pdf-empty">
         <i class="fas fa-file-pdf"></i>
         <p>Click <strong>Select PDF</strong> to open a file.</p>
-        <p class="dtm-pdf-empty-hint">Then use <strong>Select Tables</strong> to draw regions over table content.</p>
+        <p class="dtm-pdf-empty-hint">Pick <strong>Single Col</strong> or <strong>Multi Col</strong>, then draw regions over table content.</p>
       </div>
       {{/unless}}
       <canvas id="dtm-pdf-canvas"></canvas>
@@ -46,25 +64,97 @@
 
     <div class="dtm-region-list-header">
       <span>Tables</span>
-      <span class="dtm-badge">{{regions.length}}</span>
+      <span class="dtm-badge">{{totalRegionCount}}</span>
+    </div>
+
+    <div class="dtm-group-toolbar">
+      <button type="button" data-action="addPrefixGroup" class="dtm-btn-secondary"
+              {{#unless hasPdf}}disabled{{/unless}}
+              title="Create a new prefix group (e.g. Elf, Fighter) and its first instance. Regions drawn while this instance is active will share a role template with its sibling instances.">
+        <i class="fas fa-plus"></i> Prefix Group
+      </button>
+      <button type="button" data-action="newGroupInstance" class="dtm-btn-secondary"
+              {{#unless hasFamilies}}disabled{{/unless}}
+              title="Add another instance that shares the active family's role template (e.g. add Dwarf alongside Elf).">
+        <i class="fas fa-layer-group"></i> New Instance
+      </button>
     </div>
 
     <div class="dtm-region-list">
-      {{#each regions}}
-      <div class="dtm-region-item{{#if this.isActive}} dtm-region-active{{/if}}"
-           data-region-id="{{this.id}}">
-        <input type="text" class="dtm-region-name" value="{{this.name}}" placeholder="Table name">
-        <span class="dtm-badge dtm-page-badge">p.{{this.page}}</span>
-        <span class="dtm-badge">{{this.entryCount}} rows</span>
-        <button type="button" data-action="previewRegion" title="Preview / hide preview">
-          <i class="fas fa-eye"></i>
-        </button>
-        <button type="button" data-action="deleteRegion" title="Delete region">
-          <i class="fas fa-trash"></i>
-        </button>
+      {{#each instances}}
+      <div class="dtm-instance-block">
+        <div class="dtm-instance-header{{#if this.isActive}} dtm-instance-active{{/if}}"
+             data-action="activateInstance" data-instance-id="{{this.id}}"
+             title="Click to make this instance the active draw target">
+          <button type="button" class="dtm-instance-chevron"
+                  data-action="toggleInstanceExpand" data-instance-id="{{this.id}}"
+                  title="Expand / collapse">
+            <i class="fas {{#if this.isExpanded}}fa-chevron-down{{else}}fa-chevron-right{{/if}}"></i>
+          </button>
+          <input type="text" class="dtm-instance-name" value="{{this.name}}"
+                 placeholder="Instance name" data-instance-id="{{this.id}}"
+                 title="Instance prefix (e.g. Elf, Dwarf)">
+          <span class="dtm-badge">{{this.regions.length}}</span>
+          <button type="button" class="dtm-instance-delete"
+                  data-action="deleteInstance" data-instance-id="{{this.id}}"
+                  title="Delete instance and all its regions">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+        {{#if this.isExpanded}}
+        <div class="dtm-instance-regions">
+          {{#each this.regions}}
+          <div class="dtm-region-item{{#if this.isActive}} dtm-region-active{{/if}}"
+               data-region-id="{{this.id}}">
+            <input type="text" class="dtm-region-name" value="{{this.name}}" placeholder="Role name">
+            {{#if this.isOverride}}<span class="dtm-badge dtm-override-badge" title="Per-region name override (differs from shared role)">~</span>{{/if}}
+            <span class="dtm-badge dtm-mode-badge dtm-mode-{{this.mode}}" title="Extraction mode">{{this.mode}}</span>
+            <span class="dtm-badge dtm-page-badge">p.{{this.page}}</span>
+            <span class="dtm-badge">{{this.entryCount}} rows</span>
+            <button type="button" data-action="previewRegion" title="Preview / hide preview">
+              <i class="fas fa-eye"></i>
+            </button>
+            <button type="button" data-action="deleteRegion" title="Delete region">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+          {{/each}}
+          {{#unless this.regions.length}}
+          <div class="dtm-region-empty dtm-instance-empty">Empty &mdash; activate this instance and draw regions.</div>
+          {{/unless}}
+        </div>
+        {{/if}}
       </div>
       {{/each}}
-      {{#unless regions.length}}
+
+      <div class="dtm-instance-block dtm-ungrouped-block">
+        <div class="dtm-instance-header{{#if isUngroupedActive}} dtm-instance-active{{/if}}"
+             data-action="activateUngrouped"
+             title="Regions drawn while no group is active land here. Click to make Ungrouped the active target.">
+          <span class="dtm-instance-chevron dtm-ungrouped-icon"><i class="fas fa-folder-open"></i></span>
+          <span class="dtm-ungrouped-label">Ungrouped</span>
+          <span class="dtm-badge">{{ungroupedRegions.length}}</span>
+        </div>
+        <div class="dtm-instance-regions">
+          {{#each ungroupedRegions}}
+          <div class="dtm-region-item{{#if this.isActive}} dtm-region-active{{/if}}"
+               data-region-id="{{this.id}}">
+            <input type="text" class="dtm-region-name" value="{{this.name}}" placeholder="Table name">
+            <span class="dtm-badge dtm-mode-badge dtm-mode-{{this.mode}}" title="Extraction mode">{{this.mode}}</span>
+            <span class="dtm-badge dtm-page-badge">p.{{this.page}}</span>
+            <span class="dtm-badge">{{this.entryCount}} rows</span>
+            <button type="button" data-action="previewRegion" title="Preview / hide preview">
+              <i class="fas fa-eye"></i>
+            </button>
+            <button type="button" data-action="deleteRegion" title="Delete region">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+
+      {{#unless totalRegionCount}}
       <div class="dtm-region-empty">
         Draw selection boxes over table regions in the PDF to add them here.
       </div>
@@ -115,6 +205,10 @@
         <label class="dtm-option-row">
           <input type="checkbox" name="makeCompound" {{#if makeCompound}}checked{{/if}}>
           Create compound table for multi-column regions
+        </label>
+        <label class="dtm-option-row">
+          <input type="checkbox" name="createInstanceFolders" {{#if createInstanceFolders}}checked{{/if}}>
+          Create a folder per instance (e.g. Elf, Dwarf)
         </label>
       </div>
       <div class="dtm-dialog-buttons">

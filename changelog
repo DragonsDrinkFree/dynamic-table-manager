@@ -1,3 +1,27 @@
+# v1.3.0
+
+## Major
+- Implemented Prefix templates for repeated content formats.
+- Folder structure added for multiple tables.
+
+# v1.2.0
+
+## Major
+- Table Recipe export for PDF scan mode
+- Single vs Multi Column Table scan in PDF mode.
+
+## Minor
+
+
+# V1.1.1
+
+## major
+- Implemented full editor for text results.
+## minor
+- Added UUID copier to title bar of tables
+- Fixed d100 "00" interaction with parsed tables
+
+
 # V1.1.0
 
 ## Major

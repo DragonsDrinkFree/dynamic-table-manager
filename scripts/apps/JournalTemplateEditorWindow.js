@@ -52,7 +52,8 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
       clearOutputJournal:JournalTemplateEditorWindow.#onClearOutputJournal,
       rollTemplate:      JournalTemplateEditorWindow.#onRollTemplate,
       undo:              JournalTemplateEditorWindow.#onUndo,
-      redo:              JournalTemplateEditorWindow.#onRedo
+      redo:              JournalTemplateEditorWindow.#onRedo,
+      copyUuid:          JournalTemplateEditorWindow.#onCopyUuid
     }
   };
 
@@ -127,8 +128,20 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
   // ---- Render ----------------------------------------------------------------
 
   /** @override */
-  _onRender(context, options) {
+  _onRender(_context, _options) {
     const html = this.element;
+
+    // Inject copy-UUID button directly onto the title bar (before the "..." overflow menu)
+    const toggleBtn = html.querySelector('.window-header [data-action="toggleControls"]');
+    if (toggleBtn && !html.querySelector('.window-header [data-action="copyUuid"]')) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "header-control fa-solid fa-passport icon";
+      btn.dataset.action = "copyUuid";
+      btn.dataset.tooltip = "Copy UUID";
+      btn.setAttribute("aria-label", "Copy UUID");
+      toggleBtn.before(btn);
+    }
 
     html.addEventListener("change", ev => this._onFieldChange(ev));
     html.addEventListener("keydown", ev => this._onKeyDown(ev));
@@ -233,7 +246,7 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
     this.render();
   }
 
-  static async #onDeleteKey(ev, target) {
+  static async #onDeleteKey(_ev, target) {
     const row = target.closest("[data-key-id]");
     if (!row) return;
     const before = this._getState();
@@ -242,7 +255,7 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
     this.render();
   }
 
-  static async #onPickSourceTable(ev, target) {
+  static async #onPickSourceTable(_ev, target) {
     const row = target.closest("[data-key-id]");
     if (!row) return;
     const resultId = row.dataset.keyId;
@@ -261,7 +274,7 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
     this.render();
   }
 
-  static async #onPickTemplatePage(ev, target) {
+  static async #onPickTemplatePage(_ev, target) {
     const anchorRect = target.getBoundingClientRect();
     const selection = await JournalPagePickerPopup.open(anchorRect);
     if (!selection) return;
@@ -272,7 +285,7 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
     this.render();
   }
 
-  static async #onPickOutputJournal(ev, target) {
+  static async #onPickOutputJournal(_ev, target) {
     const anchorRect = target.getBoundingClientRect();
     const selection = await DocumentPickerPopup.open(anchorRect, "", ["JournalEntry"]);
     if (!selection) return;
@@ -310,6 +323,13 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
     if (!state) return;
     await this._applyState(state);
     this.render();
+  }
+
+  static async #onCopyUuid() {
+    await game.clipboard.copyPlainText(this.table.uuid);
+    ui.notifications.info(game.i18n.format("DOCUMENT.IdCopied", {
+      label: this.table.name, type: "uuid", id: this.table.uuid
+    }));
   }
 
   // ---- State helpers ---------------------------------------------------------

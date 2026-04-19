@@ -10,7 +10,6 @@ Ordering of results can be easily done by changing a number or dragging results 
 Compendiums can be scanned for key words to automatically replace text tables with linked objects for Actors/Items/journals/tables.
 
 Document quick search: Can quickly search from within the table editor for other objects to provide quick updates to linking. Very easy for linking sub-tables.
-## User Guide
 
 ## Additional Features & Bug Reports
 This module has been designed from my perspective to solve as many pain points as i could anticipate based on my own use cases, but your paint points may be different. Please feel free to drop an issue if there are idea's that could make this module more flexible or more powerful.
