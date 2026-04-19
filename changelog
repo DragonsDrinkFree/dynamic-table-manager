@@ -2,6 +2,7 @@
 
 ## Major
 - Implemented Prefix templates for repeated content formats.
+- Folder structure added for multiple tables.
 
 # v1.2.0
 
@@ -14,9 +15,9 @@
 
 # V1.1.1
 
-# major
+## major
 - Implemented full editor for text results.
-# minor
+## minor
 - Added UUID copier to title bar of tables
 - Fixed d100 "00" interaction with parsed tables
 

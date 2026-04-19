@@ -43,6 +43,7 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
   #usePrefix     = false;
   #tablePrefix   = "";
   #makeCompound  = true;
+  #createInstanceFolders = false;
 
   // ---- pdf.js module (lazy) ----
   static #pdfjs = null;
@@ -152,7 +153,8 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       hasRegions:    this.#regions.length > 0,
       usePrefix:     this.#usePrefix,
       tablePrefix:   this.#tablePrefix,
-      makeCompound:  this.#makeCompound
+      makeCompound:  this.#makeCompound,
+      createInstanceFolders: this.#createInstanceFolders
     };
   }
 
@@ -327,6 +329,12 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     if (compoundCheck) {
       compoundCheck.addEventListener("change", () => {
         this.#makeCompound = compoundCheck.checked;
+      });
+    }
+    const folderCheck = this.element?.querySelector("[name='createInstanceFolders']");
+    if (folderCheck) {
+      folderCheck.addEventListener("change", () => {
+        this.#createInstanceFolders = folderCheck.checked;
       });
     }
   }
@@ -711,19 +719,45 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
     const makeCompound = this.#makeCompound;
 
+    const instanceFolderIds = new Map();
+    if (this.#createInstanceFolders) {
+      const uniqueInstanceIds = new Set(withData.map(r => r.instanceId).filter(Boolean));
+      for (const instanceId of uniqueInstanceIds) {
+        const info = this.#findInstance(instanceId);
+        if (!info) continue;
+        const folderId = await this.#ensureInstanceFolder(info.instance.name);
+        if (folderId) instanceFolderIds.set(instanceId, folderId);
+      }
+    }
+
     const allTables = [];
     for (const region of withData) {
       const tableName = this.#buildTableName(region);
+      const folderId = (region.instanceId && instanceFolderIds.has(region.instanceId))
+        ? instanceFolderIds.get(region.instanceId)
+        : this.#folderId;
       if (region.parsed.isMultiColumn) {
-        const tables = await TableCreator.createSplitTables(tableName, region.parsed, this.#folderId, makeCompound);
+        const tables = await TableCreator.createSplitTables(tableName, region.parsed, folderId, makeCompound);
         allTables.push(...tables);
       } else {
-        allTables.push(await TableCreator.createSingleTable(tableName, region.parsed, this.#folderId));
+        allTables.push(await TableCreator.createSingleTable(tableName, region.parsed, folderId));
       }
     }
 
     ui.notifications.info(`Created ${allTables.length} table(s) from PDF scan.`);
     this.close();
+  }
+
+  async #ensureInstanceFolder(name) {
+    const parentId = this.#folderId ?? null;
+    const existing = game.folders.find(f =>
+      f.type === "RollTable" &&
+      f.name === name &&
+      (f.folder?.id ?? null) === parentId
+    );
+    if (existing) return existing.id;
+    const folder = await Folder.create({ name, type: "RollTable", folder: parentId });
+    return folder?.id ?? null;
   }
 
   // ---- Group actions ----
@@ -836,7 +870,8 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       options: {
         usePrefix: this.#usePrefix,
         tablePrefix: this.#tablePrefix,
-        makeCompound: this.#makeCompound
+        makeCompound: this.#makeCompound,
+        createInstanceFolders: this.#createInstanceFolders
       },
       families: this.#families.map(f => ({
         id: f.id,
@@ -960,6 +995,7 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       this.#usePrefix    = !!recipe.options?.usePrefix;
       this.#tablePrefix  = String(recipe.options?.tablePrefix ?? "");
       this.#makeCompound = recipe.options?.makeCompound !== false;
+      this.#createInstanceFolders = !!recipe.options?.createInstanceFolders;
 
       for (const r of inRange) {
         const rect   = { x: +r.rect.x, y: +r.rect.y, w: +r.rect.w, h: +r.rect.h };
