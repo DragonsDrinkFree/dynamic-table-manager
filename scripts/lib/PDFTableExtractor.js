@@ -38,13 +38,40 @@ export class PDFTableExtractor {
    * @returns {{ formula: string, isMultiColumn: boolean, entries?: [], columns?: [] }}
    */
   static extract(textItems, rect, mode = "multi") {
+    let result;
     if (mode === "single") {
-      return PDFTableExtractor.#extractSingle(textItems, rect);
+      result = PDFTableExtractor.#extractSingle(textItems, rect);
+    } else {
+      const prep = PDFTableExtractor.#prepareGrid(textItems, rect);
+      if (!prep) return { formula: "", isMultiColumn: false, entries: [] };
+      const { grid, firstColIsRange, colCount } = prep;
+      result = PDFTableExtractor.#extractMulti(grid, firstColIsRange, colCount);
     }
-    const prep = PDFTableExtractor.#prepareGrid(textItems, rect);
-    if (!prep) return { formula: "", isMultiColumn: false, entries: [] };
-    const { grid, firstColIsRange, colCount } = prep;
-    return PDFTableExtractor.#extractMulti(grid, firstColIsRange, colCount);
+    if (!result.formula) result.formula = PDFTableExtractor.#inferFormula(textItems, rect, result);
+    return result;
+  }
+
+  /**
+   * Infer a dice formula for the table.
+   * Priority 1: a standalone dice token in the region (e.g. "d100", "D12", "d%").
+   * Priority 2: "1d{rowCount}" based on how many rows were extracted.
+   */
+  static #inferFormula(textItems, rect, result) {
+    const filtered = PDFTableExtractor.#filterItems(textItems, rect);
+    const DICE_STANDALONE = /^[dD](\d+|%)$/;
+    for (const item of filtered) {
+      const str = item.str?.trim() ?? "";
+      if (!str) continue;
+      const m = str.match(DICE_STANDALONE);
+      if (m) {
+        const size = m[1] === "%" ? "100" : m[1];
+        return `1d${size}`;
+      }
+    }
+    const count = result.isMultiColumn
+      ? (result.columns?.[0]?.entries?.length ?? 0)
+      : (result.entries?.length ?? 0);
+    return count > 0 ? `1d${count}` : "";
   }
 
   // ---- Shared preparation pipeline ----

@@ -43,7 +43,14 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
     // Take initial snapshot for revert
     this.undoManager.takeSnapshot(this._getTableState());
+
+    // Re-render when any result on this table has its drawn flag changed externally
+    // (e.g. native Foundry draw(), or another client toggling the lock).
+    this._drawnHookId = Hooks.on("updateTableResult", (result, changes) => {
+      if (result.parent?.id === this.table.id && "drawn" in changes) this.render();
+    });
   }
+
 
   static DEFAULT_OPTIONS = {
     classes: ["dynamic-table-manager", "dtm-editor"],
@@ -72,7 +79,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       autoFormula:  TableEditorWindow.#onAutoFormula,
       detectLinks:  TableEditorWindow.#onDetectLinks,
       changeAllTypes: TableEditorWindow.#onChangeAllTypes,
-      copyUuid:       TableEditorWindow.#onCopyUuid
+      copyUuid:       TableEditorWindow.#onCopyUuid,
+      toggleDrawn:    TableEditorWindow.#onToggleDrawn,
+      resetDrawn:     TableEditorWindow.#onResetDrawn
     }
   };
 
@@ -133,6 +142,8 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       description: this.table.description,
       results: mappedResults,
       isCompound: !!this.table.getFlag("dynamic-table-manager", "isCompound"),
+      replacement: this.table.replacement ?? true,
+      showReset: !(this.table.replacement ?? true),
       linkedAll,
       canUndo: this.undoManager.canUndo(),
       canRedo: this.undoManager.canRedo(),
@@ -212,6 +223,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       name: this.table.name,
       formula: this.table.formula,
       description: this.table.description,
+      replacement: this.table.replacement ?? true,
       results: this.table.results.contents.map(r => r.toObject())
     };
   }
@@ -337,10 +349,14 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       return;
     }
 
-    // Multiple results share this range — draw all of them
-    await this.table.updateEmbeddedDocuments("TableResult",
-      matching.map(r => ({ _id: r.id, drawn: true }))
-    );
+    // Multiple results share this range — draw all of them.
+    // Only mark as drawn when the table uses draw-without-replacement;
+    // in replacement mode the drawn flag would permanently exclude results.
+    if (!this.table.replacement) {
+      await this.table.updateEmbeddedDocuments("TableResult",
+        matching.map(r => ({ _id: r.id, drawn: true }))
+      );
+    }
 
     const lines = [];
     for (const result of matching) {
@@ -365,6 +381,28 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     // CONST.CHAT_MESSAGE_TYPES was removed in Foundry v14
     if (CONST.CHAT_MESSAGE_TYPES?.ROLL !== undefined) msgData.type = CONST.CHAT_MESSAGE_TYPES.ROLL;
     await ChatMessage.create(msgData);
+  }
+
+  static async #onToggleDrawn(_event, target) {
+    const row = target.closest("[data-result-id]");
+    const resultId = row?.dataset.resultId;
+    if (!resultId) return;
+    const result = this.table.results.get(resultId);
+    if (!result) return;
+    await this.table.updateEmbeddedDocuments("TableResult", [{ _id: resultId, drawn: !result.drawn }]);
+    this.render();
+  }
+
+  static async #onResetDrawn() {
+    const drawn = this.table.results.contents.filter(r => r.drawn);
+    if (drawn.length === 0) {
+      ui.notifications.info("No results are marked as drawn.");
+      return;
+    }
+    await this.table.updateEmbeddedDocuments("TableResult",
+      drawn.map(r => ({ _id: r.id, drawn: false }))
+    );
+    this.render();
   }
 
   static async #onUndo() {
@@ -395,12 +433,16 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
   }
 
   static async #onAutoFormula() {
-    const count = this.table.results.size;
-    if (count === 0) {
+    if (this.table.results.size === 0) {
       ui.notifications.warn("Add rows first before setting the formula.");
       return;
     }
-    const formula = `d${count}`;
+    // Use the highest range[1] value across all results.
+    // This correctly handles:
+    //   - anchored groups (multiple rows sharing the same number → only 1 die face each)
+    //   - ranged rows (1-5, 6-10 → d10 rather than d2)
+    const maxHigh = Math.max(...this.table.results.contents.map(r => r.range[1]));
+    const formula = `d${maxHigh}`;
     const before = this._getTableState();
     await this.table.update({ formula });
     this._recordUndo("edit_formula", before);
@@ -817,9 +859,10 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     // ---- Table-level fields (inside .dtm-editor-header) ----
     if (target.closest(".dtm-editor-header")) {
       const before = this._getTableState();
-      if (field === "name")        await this.table.update({ name: target.value });
-      else if (field === "formula") await this.table.update({ formula: target.value });
+      if (field === "name")             await this.table.update({ name: target.value });
+      else if (field === "formula")     await this.table.update({ formula: target.value });
       else if (field === "description") await this.table.update({ description: target.value });
+      else if (field === "replacement") { await this.table.update({ replacement: target.checked }); this.render(); }
       else return;
       this._recordUndo(`edit_${field}`, before);
       return;
@@ -969,7 +1012,11 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
    */
   async _updateRowRange(resultId, newRange) {
     const [newLow, newHigh] = newRange;
-    const shiftSize = newHigh - newLow + 1;
+
+    // Shift = how much the high boundary actually moved, not the total size of the range.
+    // e.g. [1,1] → [1,5]: shift = 5-1 = 4, so the next row at 2 lands at 6, not 7.
+    const oldHigh = this.table.results.get(resultId)?.range[1] ?? newLow - 1;
+    const shift = newHigh - oldHigh;
 
     // Find rows that conflict with the new range (excluding the row being edited)
     const conflicting = this.table.results.filter(r => {
@@ -979,8 +1026,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
     const before = this._getTableState();
 
-    // Shift conflicting rows and all subsequent rows up to make room
-    if (conflicting.length > 0) {
+    // Shift conflicting rows and all subsequent rows up to make room.
+    // Only shift when the range actually grew — shrinking never creates new conflicts.
+    if (conflicting.length > 0 && shift > 0) {
       const toShift = this.table.results.filter(r => {
         if (r.id === resultId) return false;
         return r.range[0] >= newLow;
@@ -989,8 +1037,8 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
         await this.table.updateEmbeddedDocuments("TableResult",
           toShift.map(r => ({
             _id: r.id,
-            range: [r.range[0] + shiftSize, r.range[1] + shiftSize],
-            weight: this._weightFromRange([r.range[0] + shiftSize, r.range[1] + shiftSize])
+            range: [r.range[0] + shift, r.range[1] + shift],
+            weight: this._weightFromRange([r.range[0] + shift, r.range[1] + shift])
           }))
         );
       }
@@ -1268,6 +1316,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
   /** @override */
   async close(options = {}) {
+    Hooks.off("updateTableResult", this._drawnHookId);
     TableEditorWindow._instances.delete(this.table.id);
     return super.close(options);
   }

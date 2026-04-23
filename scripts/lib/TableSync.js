@@ -34,11 +34,13 @@ export class TableSync {
     this._cancelDebounce();
 
     // Update top-level table fields
-    await this.#table.update({
+    const tableUpdate = {
       name: state.name,
       formula: state.formula,
       description: state.description
-    });
+    };
+    if (state.replacement !== undefined) tableUpdate.replacement = state.replacement;
+    await this.#table.update(tableUpdate);
 
     // Replace all results: delete existing, then create from state
     const existingIds = this.#table.results.map(r => r.id);

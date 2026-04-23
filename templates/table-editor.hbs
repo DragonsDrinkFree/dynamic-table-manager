@@ -22,6 +22,18 @@
       <label for="dtm-description">Description</label>
       <textarea id="dtm-description" data-field="description" rows="2" placeholder="Table description...">{{description}}</textarea>
     </div>
+
+    <div class="dtm-field-row dtm-replacement-row">
+      <label class="dtm-replacement-label">
+        <input type="checkbox" data-field="replacement" {{#if replacement}}checked{{/if}}>
+        Draw with Replacement
+      </label>
+      {{#if showReset}}
+      <button type="button" data-action="resetDrawn" class="dtm-reset-drawn-btn" title="Clear all drawn/locked results — reset the draw pool">
+        <i class="fas fa-rotate-left"></i> Reset Pool
+      </button>
+      {{/if}}
+    </div>
   </section>
 
   {{!-- Compound table banner --}}
@@ -73,13 +85,14 @@
     </span>
     <span class="dtm-col-drag"></span>
     <span class="dtm-col-content">Content</span>
+    <span class="dtm-col-drawn"></span>
     <span class="dtm-col-actions"></span>
   </div>
 
   {{!-- Row List --}}
   <section class="dtm-row-list">
     {{#each results}}
-    <div class="dtm-row{{#if this.groupClass}} {{this.groupClass}}{{/if}}" data-result-id="{{this.id}}">
+    <div class="dtm-row{{#if this.groupClass}} {{this.groupClass}}{{/if}}{{#if this.drawn}} dtm-drawn{{/if}}" data-result-id="{{this.id}}">
       <button type="button" class="dtm-col-link dtm-link-btn{{#if this.linked}} dtm-linked{{/if}}{{#if this.isGroupAnchor}} dtm-group-anchor{{/if}}" data-action="toggleLink" title="{{#if this.isGroupAnchor}}Anchor row — linked rows below share this range{{else if this.linked}}Unlink row{{else}}Link to row above{{/if}}" {{#if @first}}disabled{{/if}}>
         {{#if this.isGroupAnchor}}<i class="fas fa-anchor"></i>{{else}}<i class="fas fa-link"></i>{{/if}}
       </button>
@@ -111,6 +124,14 @@
             <span class="dtm-drop-hint">Drop a {{this.typeLabel}} here</span>
           </div>
         {{/if}}
+      </div>
+
+      <div class="dtm-col-drawn">
+        <button type="button" class="dtm-drawn-btn{{#if this.drawn}} dtm-is-drawn{{/if}}"
+                data-action="toggleDrawn"
+                title="{{#if this.drawn}}Unlock result (remove from drawn pool){{else}}Lock result (mark as drawn){{/if}}">
+          <i class="fas {{#if this.drawn}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
+        </button>
       </div>
 
       <div class="dtm-col-actions">
