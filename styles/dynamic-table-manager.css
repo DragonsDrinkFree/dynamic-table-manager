@@ -86,7 +86,7 @@ button.dtm-create-table {
   flex: 1;
 }
 
-.dtm-editor-header input,
+.dtm-editor-header input:not([type="checkbox"]),
 .dtm-editor-header textarea {
   width: 100%;
   border: 1px solid var(--color-border-light-tertiary, #555);
@@ -627,6 +627,83 @@ button.dtm-create-table {
 input.dtm-col-range:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* --- Draw-with-replacement row (editor header) --- */
+
+.dtm-replacement-row {
+  align-items: center;
+  gap: 12px;
+}
+
+.dtm-replacement-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--color-text-light-secondary, #ccc);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.dtm-reset-drawn-btn {
+  background: none;
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 3px;
+  color: var(--color-text-light-tertiary, #888);
+  cursor: pointer;
+  padding: 3px 8px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dtm-reset-drawn-btn:hover {
+  color: var(--color-text-light-primary, #eee);
+  border-color: var(--color-border-light-primary, #888);
+}
+
+/* --- Drawn (locked) result rows --- */
+
+.dtm-row.dtm-drawn {
+  opacity: 0.5;
+}
+
+.dtm-col-drawn {
+  flex: 0 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dtm-drawn-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-light-tertiary, #888);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.3;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.dtm-drawn-btn:hover {
+  opacity: 1;
+  color: var(--color-warning, #f0a000);
+}
+
+.dtm-drawn-btn.dtm-is-drawn {
+  color: var(--color-warning, #f0a000);
+  opacity: 1;
 }
 
 /* --- Compound table banner (editor) --- */

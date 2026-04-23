@@ -1,3 +1,11 @@
+# v1.3.2
+
+## Minor
+- Fix for Drawn: True Bug regarding anchored tables.
+- Fix for bug in range setting's jumping one too far
+- Fix bug in auto formula that was producing weird results.
+
+
 # v1.3.1
 
 ## minor
