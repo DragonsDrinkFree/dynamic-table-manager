@@ -1,0 +1,159 @@
+{{!-- Item Template Editor --}}
+<div class="dtm-it-container">
+
+  {{!-- ====== LEFT PANE ====== --}}
+  <div class="dtm-it-left">
+
+    {{!-- Config Header --}}
+    <div class="dtm-it-header">
+
+      {{!-- Row 1: Table name + Item Type --}}
+      <div class="dtm-field-group">
+        <label>Table Name</label>
+        <input type="text" data-field="tableName" value="{{tableName}}" />
+      </div>
+      <div class="dtm-field-group">
+        <label>Item Type</label>
+        <select data-field="itemType">
+          <option value="">— Select type —</option>
+          {{#each itemTypes}}
+          <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+          {{/each}}
+        </select>
+      </div>
+
+      {{!-- Row 2: Output Folder + Base Item --}}
+      <div class="dtm-field-group">
+        <label>Output Folder</label>
+        <div class="dtm-it-picker-row">
+          <span class="dtm-it-picker-name">{{#if outputFolderName}}{{outputFolderName}}{{else}}<em>None</em>{{/if}}</span>
+          <button type="button" data-action="pickOutputFolder" title="Choose folder">
+            <i class="fas fa-folder-open"></i>
+          </button>
+        </div>
+      </div>
+      <div class="dtm-field-group">
+        <label>Base Item</label>
+        <div class="dtm-it-base-row">
+          <select data-field="baseItemMode" style="flex:0 0 130px">
+            {{#each baseItemModes}}
+            <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+            {{/each}}
+          </select>
+          {{#if (eq config.baseItem.mode "fixed")}}
+          <span class="dtm-it-picker-name" style="flex:1">{{#if baseItemName}}{{baseItemName}}{{else}}<em>None</em>{{/if}}</span>
+          <button type="button" data-action="pickBaseItem" title="Pick item">
+            <i class="fas fa-scroll"></i>
+          </button>
+          {{#if baseItemName}}<button type="button" data-action="clearBaseItem" title="Clear" style="color:#c44"><i class="fas fa-times"></i></button>{{/if}}
+          {{/if}}
+          {{#if (eq config.baseItem.mode "table")}}
+          <span class="dtm-it-picker-name" style="flex:1">{{#if baseTableName}}{{baseTableName}}{{else}}<em>None</em>{{/if}}</span>
+          <button type="button" data-action="pickBaseTable" title="Pick table">
+            <i class="fas fa-table"></i>
+          </button>
+          {{#if baseTableName}}<button type="button" data-action="clearBaseItem" title="Clear" style="color:#c44"><i class="fas fa-times"></i></button>{{/if}}
+          {{/if}}
+        </div>
+      </div>
+
+      {{!-- Row 3: Image (full width) --}}
+      <div class="dtm-field-group dtm-it-header-full">
+        <label>Image</label>
+        <div class="dtm-it-base-row">
+          <select data-field="imgMode" style="flex:0 0 160px">
+            {{#each imgModes}}
+            <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+            {{/each}}
+          </select>
+          {{#if (eq config.img.mode "fixed")}}
+          <input type="text" data-field="imgPath" value="{{config.img.path}}"
+                 placeholder="Image path…" style="flex:1" />
+          <button type="button" data-action="pickImgPath" title="Browse for image">
+            <i class="fas fa-image"></i>
+          </button>
+          {{/if}}
+          {{#if (eq config.img.mode "folder")}}
+          <input type="text" data-field="imgPath" value="{{config.img.path}}"
+                 placeholder="Folder path…" style="flex:1" />
+          <button type="button" data-action="pickImgFolder"
+                  title="Browse — navigate to folder and click any image inside it">
+            <i class="fas fa-folder-open"></i>
+          </button>
+          {{/if}}
+        </div>
+      </div>
+
+    </div>{{!-- /.dtm-it-header --}}
+
+    {{!-- Toolbar --}}
+    <div class="dtm-toolbar dtm-it-toolbar">
+      <div class="dtm-toolbar-left">
+        <button type="button" data-action="addConditional"
+                data-parent-id="" data-parent-section="">
+          <i class="fas fa-code-branch"></i> Add Conditional
+        </button>
+        <button type="button" data-action="addGroup"
+                data-parent-id="" data-parent-section="">
+          <i class="fas fa-layer-group"></i> Add Group
+        </button>
+        <button type="button" data-action="generate" class="dtm-it-generate-btn">
+          <i class="fas fa-dice"></i> Generate Item
+        </button>
+      </div>
+      <div class="dtm-toolbar-right">
+        <button type="button" data-action="undo" title="Undo (Ctrl+Z)" {{#unless canUndo}}disabled{{/unless}}>
+          <i class="fas fa-undo"></i>
+        </button>
+        <button type="button" data-action="redo" title="Redo (Ctrl+Y)" {{#unless canRedo}}disabled{{/unless}}>
+          <i class="fas fa-redo"></i>
+        </button>
+      </div>
+    </div>
+
+    {{!-- Action Tree --}}
+    <div class="dtm-it-tree" data-parent-id="" data-parent-section="">
+      {{{actionTreeHtml}}}
+      {{#unless actionTreeHtml}}
+      <div class="dtm-it-empty-state">
+        <i class="fas fa-hat-wizard"></i>
+        <p>No attribute assignments yet.</p>
+        <p>Use the <strong>Attribute Browser</strong> on the right to add attributes,
+           or use <strong>Add Conditional</strong> / <strong>Add Group</strong> in the toolbar.</p>
+      </div>
+      {{/unless}}
+    </div>{{!-- /.dtm-it-tree --}}
+
+  </div>{{!-- /.dtm-it-left --}}
+
+  {{!-- ====== RIGHT PANE: Attribute Browser ====== --}}
+  <div class="dtm-it-right">
+    <div class="dtm-it-attr-header">
+      <span>Attributes</span>
+      <span class="dtm-badge">{{attrRows.length}}</span>
+    </div>
+    <div class="dtm-it-attr-search">
+      <i class="fas fa-search" style="opacity:0.5;flex-shrink:0"></i>
+      <input type="text" class="dtm-it-attr-filter" placeholder="Filter…" value="{{attrFilter}}" />
+    </div>
+    <div class="dtm-it-attr-list">
+      {{#each attrRows}}
+      <div class="dtm-it-attr-row" data-path="{{this.path}}">
+        <span class="dtm-it-attr-path" title="{{this.path}}">{{this.path}}</span>
+        <button type="button" class="dtm-it-attr-add" data-action="addAttrFromBrowser"
+                data-path="{{this.path}}" title="Add to tree">
+          <i class="fas fa-plus"></i>
+        </button>
+      </div>
+      {{/each}}
+      {{#unless attrRows.length}}
+      {{#if config.itemType}}
+      <div class="dtm-region-empty">No attributes match your filter.</div>
+      {{else}}
+      <div class="dtm-region-empty">Select an item type above to browse attributes.</div>
+      {{/if}}
+      {{/unless}}
+    </div>
+  </div>{{!-- /.dtm-it-right --}}
+
+</div>{{!-- /.dtm-it-container --}}

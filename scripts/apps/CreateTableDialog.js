@@ -1,5 +1,6 @@
 import { TableEditorWindow } from "./TableEditorWindow.js";
 import { JournalTemplateEditorWindow } from "./JournalTemplateEditorWindow.js";
+import { ItemTemplateEditorWindow } from "./ItemTemplateEditorWindow.js";
 import { PDFScannerWindow } from "./PDFScannerWindow.js";
 import { PasteTableParser } from "../lib/PasteTableParser.js";
 import { TableCreator } from "../lib/TableCreator.js";
@@ -62,9 +63,12 @@ export class CreateTableDialog extends HandlebarsApplicationMixin(ApplicationV2)
       defaultName: CreateTableDialog.#getDefaultTableName(),
       tableTypes: [
         { value: "basic",            label: "Basic Table" },
-        { value: "journal-template", label: "Journal Template" }
+        { value: "journal-template", label: "Journal Template" },
+        { value: "item-template",    label: "Item Template" }
       ],
       isJournalTemplate: this.#tableType === "journal-template",
+      isItemTemplate: this.#tableType === "item-template",
+      showCreationMethod: this.#tableType === "basic",
       creationMethods: [
         { value: "manual",   label: "Manual" },
         { value: "paste",    label: "Paste Table" },
@@ -156,6 +160,18 @@ export class CreateTableDialog extends HandlebarsApplicationMixin(ApplicationV2)
     const form = this.element.querySelector("form");
     const name = form.querySelector("[name='name']")?.value.trim()
                || CreateTableDialog.#getDefaultTableName();
+
+    if (this.#tableType === "item-template") {
+      const table = await RollTable.create({
+        name,
+        formula: "1",
+        folder: this.#folderId,
+        flags: { "dynamic-table-manager": { tableType: "item-template" } }
+      });
+      ItemTemplateEditorWindow.openForTable(table);
+      this.close();
+      return;
+    }
 
     if (this.#tableType === "journal-template") {
       const table = await RollTable.create({

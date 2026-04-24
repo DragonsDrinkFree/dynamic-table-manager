@@ -1,3 +1,13 @@
 # Known Bug:
 
 Foundry: Draw with replacement Toggle.
+
+
+# Item Generator
+
+## Conditionals
+Input range bands, IE D6 1-2 = Table a, 3-4 = Table B
+
+Append needs Append Method.
+
+CSS clean up for append/overwrite. Make the attribute bar slightly shorter.

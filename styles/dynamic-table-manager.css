@@ -2184,3 +2184,346 @@ input.dtm-col-range:disabled {
   margin-top: 4px;
 }
 
+/* ===================================================================
+   Item Template Editor
+   =================================================================== */
+
+.dtm-it-window .window-content { padding: 0; overflow: hidden; }
+
+.dtm-it-container { display: flex; height: 100%; overflow: hidden; }
+
+/* ── Left pane ── */
+.dtm-it-left {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--color-border-light-tertiary, #444);
+}
+
+/* ── Config header ── */
+.dtm-it-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 12px;
+  padding: 8px 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #444);
+}
+
+.dtm-it-header-full { grid-column: 1 / -1; }
+
+.dtm-it-picker-row,
+.dtm-it-base-row { display: flex; align-items: center; gap: 4px; }
+
+.dtm-it-picker-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--color-text-light-secondary, #ccc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Toolbar ── */
+.dtm-it-toolbar { flex-shrink: 0; }
+
+.dtm-it-generate-btn { background: rgba(80, 180, 100, 0.15); border-color: rgba(80, 180, 100, 0.4); }
+.dtm-it-generate-btn:hover { background: rgba(80, 180, 100, 0.3); }
+
+/* ── Action tree scroll area ── */
+.dtm-it-tree {
+  flex: 1 1 0;
+  overflow-y: auto;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 30px;
+}
+
+/* ── Attribute row (column layout) ── */
+.dtm-it-action-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+}
+
+.dtm-it-action-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--color-border-light-tertiary, #444);
+}
+
+/* ── Row column widths ── */
+.dtm-it-col-path {
+  flex: 1 1 0;
+  min-width: 60px;
+  font-family: var(--font-mono, "Courier New", monospace);
+  font-size: 11px;
+}
+
+.dtm-it-col-wmode { flex: 0 0 52px; width: 52px; font-size: 11px; }
+.dtm-it-col-srctype { flex: 0 0 62px; width: 62px; font-size: 11px; }
+
+.dtm-it-col-value {
+  flex: 1 1 0;
+  min-width: 50px;
+  font-size: 11px;
+}
+
+.dtm-it-col-label { flex: 1 1 0; min-width: 60px; font-size: 12px; }
+
+.dtm-it-table-name {
+  font-size: 11px;
+  color: var(--color-text-light-secondary, #ccc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-style: italic;
+}
+
+/* ── Block containers (Group / Conditional) ── */
+.dtm-it-block {
+  border: 1px solid var(--color-border-light-tertiary, #444);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dtm-it-group-block { border-left: 3px solid rgba(140, 200, 100, 0.5); }
+.dtm-it-cond-block  { border-left: 3px solid rgba(100, 160, 255, 0.5); }
+
+.dtm-it-block-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  min-height: 30px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.dtm-it-block-icon { flex-shrink: 0; font-size: 12px; opacity: 0.7; }
+.dtm-it-group-block > .dtm-it-block-header .dtm-it-block-icon { color: rgba(140, 200, 100, 0.9); }
+.dtm-it-cond-block > .dtm-it-block-header .dtm-it-block-icon  { color: rgba(120, 170, 255, 0.9); }
+
+/* Group body: children drop zone */
+.dtm-it-group-body {
+  background: rgba(0, 0, 0, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0;
+  min-height: 32px;
+}
+
+/* Conditional section (THEN / ELSE) */
+.dtm-it-block-section { border-top: 1px solid rgba(0, 0, 0, 0.2); }
+
+.dtm-it-section-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.1);
+  min-height: 26px;
+}
+
+.dtm-it-section-label {
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--color-text-light-tertiary, #777);
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.dtm-it-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0;
+  min-height: 30px;
+}
+
+/* ── Add buttons row (inside group / section) ── */
+.dtm-it-add-row { display: flex; align-items: center; gap: 4px; padding: 2px 6px; opacity: 0.55; }
+.dtm-it-add-row:hover { opacity: 1; }
+.dtm-it-add-row button { font-size: 11px; }
+
+/* ── Condition summary on header ── */
+.dtm-it-cond-summary {
+  font-size: 11px;
+  font-weight: bold;
+  color: rgba(140, 190, 255, 0.9);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Condition editor inline panel ── */
+.dtm-it-cond-editor {
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.dtm-it-cond-editor-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.dtm-it-cond-editor-inner label { display: flex; align-items: center; gap: 4px; }
+
+/* ── Drag-and-drop ── */
+.dtm-drag-handle {
+  flex-shrink: 0;
+  cursor: grab;
+  padding: 0 3px;
+  color: var(--color-text-light-tertiary, #666);
+  opacity: 0.4;
+  user-select: none;
+  font-size: 12px;
+}
+.dtm-drag-handle:hover { opacity: 0.9; }
+.dtm-drag-handle:active { cursor: grabbing; }
+
+.dtm-dragging { opacity: 0.35 !important; }
+
+.dtm-drop-line {
+  height: 2px;
+  background: rgba(100, 180, 255, 0.8);
+  border-radius: 1px;
+  pointer-events: none;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.dtm-drag-over {
+  outline: 2px solid rgba(100, 160, 255, 0.4);
+  outline-offset: -1px;
+  border-radius: 2px;
+}
+
+/* ── Small icon buttons in tree rows ── */
+.dtm-icon-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: var(--color-text-light-tertiary, #888);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.dtm-icon-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--color-text-light-primary, #eee); }
+.dtm-icon-btn.dtm-active { color: rgba(140, 200, 255, 0.9); background: rgba(100, 160, 240, 0.15); }
+.dtm-icon-btn.dtm-danger:hover { color: rgba(220, 80, 80, 1); background: rgba(200, 60, 60, 0.12); }
+
+/* ── Empty state ── */
+.dtm-it-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--color-text-light-tertiary, #777);
+  text-align: center;
+  gap: 4px;
+}
+
+.dtm-it-empty-state i { font-size: 32px; margin-bottom: 8px; opacity: 0.3; }
+.dtm-it-empty-state p { margin: 0; font-size: 12px; line-height: 1.5; }
+
+/* ── Right pane: Attribute Browser ── */
+.dtm-it-right { flex: 0 0 280px; display: flex; flex-direction: column; overflow: hidden; }
+
+.dtm-it-attr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-light-tertiary, #888);
+  border-bottom: 1px solid var(--color-border-light-tertiary, #444);
+  flex-shrink: 0;
+}
+
+.dtm-it-attr-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #444);
+  flex-shrink: 0;
+}
+
+.dtm-it-attr-filter {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--color-text-light-primary, #eee);
+  font-size: 12px;
+}
+
+.dtm-it-attr-list {
+  flex: 1 1 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 3px;
+}
+
+.dtm-it-attr-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+}
+
+.dtm-it-attr-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--color-border-light-tertiary, #444);
+}
+
+.dtm-it-attr-path {
+  flex: 1;
+  font-family: var(--font-mono, "Courier New", monospace);
+  font-size: 11px;
+  color: var(--color-text-light-secondary, #ccc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dtm-it-attr-add {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: var(--color-text-light-tertiary, #888);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.dtm-it-attr-add:hover {
+  color: rgba(130, 220, 140, 1);
+  background: rgba(80, 200, 100, 0.12);
+}
+
