@@ -82,26 +82,83 @@ export class ItemTemplateRoller {
   static async _evaluateActions(actions, overrides, baseData) {
     for (const action of (actions ?? [])) {
       if (action.type === "attribute") {
-        const value = await ItemTemplateRoller._resolveAttributeValue(action);
-        if (value === null || value === undefined) continue;
+        const resolved = await ItemTemplateRoller._resolveAttributeValue(action);
+        if (resolved === null || resolved === undefined) continue;
+
+        const value = resolved;
 
         if (action.writeMode === "append") {
           const existing = foundry.utils.getProperty(overrides, action.path)
             ?? foundry.utils.getProperty(baseData, action.path)
             ?? "";
-          const joined = existing ? `${existing}\n${value}` : value;
-          foundry.utils.setProperty(overrides, action.path, joined);
+          foundry.utils.setProperty(overrides, action.path,
+            ItemTemplateRoller._appendValue(existing, value, action.appendMode, action.appendSeparator)
+          );
+        } else if (action.writeMode === "prepend") {
+          const existing = foundry.utils.getProperty(overrides, action.path)
+            ?? foundry.utils.getProperty(baseData, action.path)
+            ?? "";
+          foundry.utils.setProperty(overrides, action.path,
+            ItemTemplateRoller._prependValue(existing, value, action.appendMode, action.appendSeparator)
+          );
         } else {
           foundry.utils.setProperty(overrides, action.path, value);
         }
       } else if (action.type === "group") {
-        // Group is an organizational container; its children write to their own paths
         await ItemTemplateRoller._evaluateActions(action.children ?? [], overrides, baseData);
       } else if (action.type === "conditional") {
-        const passes = await ItemTemplateRoller._evaluateCondition(action.condition);
-        const branch = passes ? (action.thenActions ?? []) : (action.elseActions ?? []);
-        await ItemTemplateRoller._evaluateActions(branch, overrides, baseData);
+        // Multi-branch format (current)
+        if (action.branches) {
+          const die = action.die ?? "d6";
+          const roll = await new Roll(`1${die}`).evaluate();
+          let executed = false;
+          for (const branch of action.branches) {
+            if (branch.isElse) continue;
+            if (roll.total >= (branch.low ?? 1) && roll.total <= (branch.high ?? 1)) {
+              await ItemTemplateRoller._evaluateActions(branch.actions ?? [], overrides, baseData);
+              executed = true;
+              break;
+            }
+          }
+          if (!executed) {
+            const elseBranch = action.branches.find(b => b.isElse);
+            if (elseBranch) {
+              await ItemTemplateRoller._evaluateActions(elseBranch.actions ?? [], overrides, baseData);
+            }
+          }
+        } else {
+          // Legacy format: condition + thenActions/elseActions
+          const passes = await ItemTemplateRoller._evaluateCondition(action.condition);
+          const branch = passes ? (action.thenActions ?? []) : (action.elseActions ?? []);
+          await ItemTemplateRoller._evaluateActions(branch, overrides, baseData);
+        }
       }
+    }
+  }
+
+  static _appendValue(existing, value, appendMode, customSeparator) {
+    if (!existing) return (appendMode === "list") ? `- ${value}` : value;
+    switch (appendMode ?? "newline") {
+      case "space":  return `${existing} ${value}`;
+      case "comma":  return `${existing}, ${value}`;
+      case "dash":   return `${existing} - ${value}`;
+      case "colon":  return `${existing}: ${value}`;
+      case "list":   return `${existing}\n- ${value}`;
+      case "custom": return `${existing}${customSeparator ?? ""}${value}`;
+      default:       return `${existing}\n\n${value}`;
+    }
+  }
+
+  static _prependValue(existing, value, appendMode, customSeparator) {
+    if (!existing) return (appendMode === "list") ? `- ${value}` : value;
+    switch (appendMode ?? "newline") {
+      case "space":  return `${value} ${existing}`;
+      case "comma":  return `${value}, ${existing}`;
+      case "dash":   return `${value} - ${existing}`;
+      case "colon":  return `${value}: ${existing}`;
+      case "list":   return `- ${value}\n${existing}`;
+      case "custom": return `${value}${customSeparator ?? ""}${existing}`;
+      default:       return `${value}\n\n${existing}`;
     }
   }
 

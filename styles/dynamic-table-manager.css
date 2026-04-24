@@ -2260,20 +2260,27 @@ input.dtm-col-range:disabled {
 
 /* ── Row column widths ── */
 .dtm-it-col-path {
-  flex: 1 1 0;
+  flex: 0.85 1 0;
   min-width: 60px;
   font-family: var(--font-mono, "Courier New", monospace);
   font-size: 11px;
 }
 
-.dtm-it-col-wmode { flex: 0 0 52px; width: 52px; font-size: 11px; }
+.dtm-it-col-wmode  { flex: 0 0 68px; width: 68px; font-size: 11px; }
 .dtm-it-col-srctype { flex: 0 0 62px; width: 62px; font-size: 11px; }
+.dtm-it-col-append { flex: 0 0 68px; width: 68px; font-size: 11px; }
+.dtm-it-col-sep    { flex: 0 0 52px; width: 52px; font-size: 11px; }
 
 .dtm-it-col-value {
   flex: 1 1 0;
   min-width: 50px;
   font-size: 11px;
 }
+
+/* ── Branch range inputs (inside conditional section bars) ── */
+.dtm-it-branch-num   { flex: 0 0 38px; width: 38px; font-size: 11px; text-align: center; }
+.dtm-it-branch-sep   { flex-shrink: 0; font-size: 11px; color: var(--color-text-light-tertiary, #888); }
+.dtm-it-branch-label { flex: 0 0 80px; width: 80px; font-size: 11px; }
 
 .dtm-it-col-label { flex: 1 1 0; min-width: 60px; font-size: 12px; }
 

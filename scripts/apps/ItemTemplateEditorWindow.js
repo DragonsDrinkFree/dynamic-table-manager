@@ -4,8 +4,6 @@ import { DocumentPickerPopup } from "./DocumentPickerPopup.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
-const DIE_OPTIONS = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"];
-
 function _esc(s) {
   return String(s ?? "")
     .replace(/&/g, "&amp;")
@@ -42,7 +40,6 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     this.undoManager = new UndoManager();
     this._attributePaths = [];
     this._attrFilter = "";
-    this._expandedCondId = null;
     this._attrFilterDebounce = null;
     this._drag = null;
     this._dropTarget = null;
@@ -53,13 +50,13 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     classes: ["dynamic-table-manager", "dtm-it-window"],
     tag: "div",
     window: { title: "Item Template Editor", icon: "fas fa-hat-wizard", resizable: true },
-    position: { width: 1020, height: 700 },
+    position: { width: 1060, height: 700 },
     actions: {
       addConditional:     ItemTemplateEditorWindow.#onAddConditional,
       addGroup:           ItemTemplateEditorWindow.#onAddGroup,
+      addBranch:          ItemTemplateEditorWindow.#onAddBranch,
+      deleteBranch:       ItemTemplateEditorWindow.#onDeleteBranch,
       deleteAction:       ItemTemplateEditorWindow.#onDeleteAction,
-      editConditional:    ItemTemplateEditorWindow.#onEditConditional,
-      closeConditional:   ItemTemplateEditorWindow.#onCloseConditional,
       addAttrFromBrowser: ItemTemplateEditorWindow.#onAddAttrFromBrowser,
       addAttributeHere:   ItemTemplateEditorWindow.#onAddAttributeHere,
       addConditionalHere: ItemTemplateEditorWindow.#onAddConditionalHere,
@@ -96,9 +93,9 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     return config;
   }
 
-  // Migrate old action format (source object) to new flat format
   _migrateActions(actions) {
     for (const action of (actions ?? [])) {
+      // Attribute: old source-object → flat format
       if (action.type === "attribute" && action.source && !action.sourceType) {
         const src = action.source;
         if (src.type === "table") {
@@ -111,9 +108,36 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
         }
         delete action.source;
       }
+
+      // Conditional: old simple condition → multi-branch
+      if (action.type === "conditional" && action.condition && !action.branches) {
+        const cond = action.condition;
+        if (cond.mode === "percent") {
+          const threshold = cond.percent ?? 50;
+          action.die = "d100";
+          action.branches = [
+            { id: foundry.utils.randomID(), label: "THEN", low: 1, high: threshold, actions: action.thenActions ?? [] },
+            { id: foundry.utils.randomID(), label: "ELSE", low: threshold + 1, high: 100, actions: action.elseActions ?? [] }
+          ];
+        } else {
+          action.die = cond.die ?? "d6";
+          action.branches = [
+            { id: foundry.utils.randomID(), label: "THEN", low: cond.low ?? 1, high: cond.high ?? 1, actions: action.thenActions ?? [] }
+          ];
+          if (action.elseActions?.length) {
+            action.branches.push({ id: foundry.utils.randomID(), label: "ELSE", isElse: true, actions: action.elseActions });
+          }
+        }
+        delete action.condition;
+        delete action.thenActions;
+        delete action.elseActions;
+      }
+
+      // Recurse
       this._migrateActions(action.children);
-      this._migrateActions(action.thenActions);
-      this._migrateActions(action.elseActions);
+      for (const branch of (action.branches ?? [])) {
+        this._migrateActions(branch.actions);
+      }
     }
   }
 
@@ -158,6 +182,10 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     if (config.baseItem.mode === "table" && config.baseItem.tableUuid) {
       const tbl = await fromUuid(config.baseItem.tableUuid).catch(() => null);
       baseTableName = tbl?.name ?? "(not found)";
+    }
+
+    if (!this._attributePaths.length && config.itemType) {
+      await this._loadAttributePaths(config.itemType);
     }
 
     const actionTreeHtml = await this._buildTreeHtml(config.actions, null, null, 0);
@@ -221,13 +249,32 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
       : `<span class="dtm-it-table-name dtm-it-col-value" title="${_esc(tableName) || "No table"}">${tableName ? _esc(tableName) : "<em>No table</em>"}</span>
          <button type="button" class="dtm-icon-btn" data-action="pickAttrTable" data-action-id="${id}" title="Pick table"><i class="fas fa-table"></i></button>`;
 
+    // Separator controls shown for both append and prepend modes
+    let appendHtml = "";
+    if (writeMode === "append" || writeMode === "prepend") {
+      const appendMode = action.appendMode ?? "newline";
+      const appendSeparator = _esc(action.appendSeparator ?? "");
+      const appendOpts = [
+        ["newline", "↵ Line"], ["space", "Space"], ["comma", "Comma"],
+        ["dash", "Dash"], ["colon", "Colon"], ["list", "List"], ["custom", "Custom"]
+      ].map(([v, l]) => `<option value="${v}" ${appendMode === v ? "selected" : ""}>${l}</option>`).join("");
+
+      const customSep = appendMode === "custom"
+        ? `<input class="dtm-it-col-sep" style="flex:0 0 52px;width:52px" type="text" data-field="attrAppendSeparator" data-action-id="${id}" value="${appendSeparator}" placeholder="Sep…" title="Custom separator" />`
+        : "";
+
+      appendHtml = `<select class="dtm-it-col-append" style="flex:0 0 68px;width:68px" data-field="attrAppendMode" data-action-id="${id}" title="Separator">${appendOpts}</select>${customSep}`;
+    }
+
     return `<div class="dtm-it-action-row" data-action-id="${id}" data-parent-id="${pid}" data-parent-section="${ps}" style="padding-left:${indent}px">
   <span class="dtm-drag-handle" data-drag-id="${id}" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></span>
   <input class="dtm-it-col-path" type="text" data-field="attrPath" data-action-id="${id}" value="${path}" placeholder="attribute.path" title="${path}" />
-  <select class="dtm-it-col-wmode" style="flex:0 0 52px;width:52px" data-field="attrWriteMode" data-action-id="${id}" title="Write mode">
-    <option value="overwrite" ${writeMode === "overwrite" ? "selected" : ""}>OW</option>
-    <option value="append" ${writeMode === "append" ? "selected" : ""}>App</option>
+  <select class="dtm-it-col-wmode" style="flex:0 0 68px;width:68px" data-field="attrWriteMode" data-action-id="${id}" title="Write mode">
+    <option value="overwrite" ${writeMode === "overwrite" ? "selected" : ""}>Overwrite</option>
+    <option value="append"    ${writeMode === "append"    ? "selected" : ""}>Append</option>
+    <option value="prepend"   ${writeMode === "prepend"   ? "selected" : ""}>Prepend</option>
   </select>
+  ${appendHtml}
   <select class="dtm-it-col-srctype" style="flex:0 0 66px;width:66px" data-field="attrSourceType" data-action-id="${id}" title="Source type">
     <option value="text" ${sourceType === "text" ? "selected" : ""}>Text</option>
     <option value="table" ${sourceType === "table" ? "selected" : ""}>Table</option>
@@ -269,82 +316,48 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     const pid = _esc(parentId ?? "");
     const ps = _esc(parentSection ?? "");
     const label = _esc(action.label ?? "Conditional");
-    const cond = action.condition ?? { mode: "percent", percent: 50 };
-    const condSummary = _esc(this._summarizeCondition(cond));
-    const isExpanded = this._expandedCondId === action.id;
+    const die = action.die ?? "d6";
     const indent = depth * 20;
     const childIndent = (depth + 1) * 20;
 
-    const thenHtml = await this._buildTreeHtml(action.thenActions ?? [], action.id, "then", depth + 1);
-    const elseHtml = await this._buildTreeHtml(action.elseActions ?? [], action.id, "else", depth + 1);
-    const condEditorHtml = isExpanded ? this._renderCondEditor(action.id, cond) : "";
+    const branchSections = [];
+    for (const branch of (action.branches ?? [])) {
+      const bid = _esc(branch.id);
+      const bLabel = _esc(branch.label ?? "");
+      const bLow = branch.low ?? 1;
+      const bHigh = branch.high ?? 1;
+      const branchActionsHtml = await this._buildTreeHtml(branch.actions ?? [], action.id, branch.id, depth + 1);
+
+      const rangeHtml = branch.isElse
+        ? `<span class="dtm-it-section-label">ELSE</span>`
+        : `<input type="number" class="dtm-it-branch-num" data-field="branchLow" data-action-id="${id}" data-branch-id="${bid}" value="${bLow}" min="1" title="Range low" />
+           <span class="dtm-it-branch-sep">–</span>
+           <input type="number" class="dtm-it-branch-num" data-field="branchHigh" data-action-id="${id}" data-branch-id="${bid}" value="${bHigh}" min="1" title="Range high" />`;
+
+      branchSections.push(`  <div class="dtm-it-block-section" data-parent-id="${id}" data-parent-section="${bid}">
+    <div class="dtm-it-section-bar" style="padding-left:${childIndent}px">
+      ${rangeHtml}
+      <input type="text" class="dtm-it-col-label dtm-it-branch-label" data-field="branchLabel" data-action-id="${id}" data-branch-id="${bid}" value="${bLabel}" placeholder="Label…" />
+      <button type="button" data-action="addAttributeHere" data-parent-id="${id}" data-parent-section="${bid}"><i class="fas fa-plus"></i> Attr</button>
+      <button type="button" data-action="addConditionalHere" data-parent-id="${id}" data-parent-section="${bid}"><i class="fas fa-code-branch"></i> Cond</button>
+      <button type="button" data-action="addGroupHere" data-parent-id="${id}" data-parent-section="${bid}"><i class="fas fa-layer-group"></i> Group</button>
+      <button type="button" class="dtm-icon-btn dtm-danger" data-action="deleteBranch" data-action-id="${id}" data-branch-id="${bid}" title="Delete branch"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="dtm-it-section-body" data-parent-id="${id}" data-parent-section="${bid}">${branchActionsHtml}</div>
+  </div>`);
+    }
 
     return `<div class="dtm-it-block dtm-it-cond-block" data-action-id="${id}" data-parent-id="${pid}" data-parent-section="${ps}">
   <div class="dtm-it-block-header dtm-it-cond-header" style="padding-left:${indent}px">
     <span class="dtm-drag-handle" data-drag-id="${id}" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></span>
     <i class="fas fa-code-branch dtm-it-block-icon"></i>
-    <span class="dtm-it-cond-summary">${condSummary}</span>
-    <input class="dtm-it-col-label" type="text" data-field="condLabel" data-action-id="${id}" value="${label}" placeholder="Label…" />
-    <button type="button" class="dtm-icon-btn${isExpanded ? " dtm-active" : ""}" data-action="editConditional" data-action-id="${id}" title="Edit condition"><i class="fas fa-pen"></i></button>
+    <input type="text" class="dtm-it-cond-die" style="flex:0 0 68px;width:68px" data-field="condDie" data-action-id="${id}" value="${_esc(die)}" placeholder="d6" title="Die formula (e.g. d6, 2d6, d100)" />
+    <input class="dtm-it-col-label" style="flex:0.75 1 0" type="text" data-field="condLabel" data-action-id="${id}" value="${label}" placeholder="Label…" />
+    <button type="button" class="dtm-icon-btn" data-action="addBranch" data-action-id="${id}" title="Add range branch"><i class="fas fa-plus"></i> Branch</button>
     <button type="button" class="dtm-icon-btn dtm-danger" data-action="deleteAction" data-action-id="${id}" title="Remove"><i class="fas fa-trash"></i></button>
   </div>
-  ${condEditorHtml}
-  <div class="dtm-it-block-section" data-parent-id="${id}" data-parent-section="then">
-    <div class="dtm-it-section-bar" style="padding-left:${childIndent}px">
-      <span class="dtm-it-section-label">THEN</span>
-      <button type="button" data-action="addAttributeHere" data-parent-id="${id}" data-parent-section="then"><i class="fas fa-plus"></i> Attr</button>
-      <button type="button" data-action="addConditionalHere" data-parent-id="${id}" data-parent-section="then"><i class="fas fa-code-branch"></i> Cond</button>
-      <button type="button" data-action="addGroupHere" data-parent-id="${id}" data-parent-section="then"><i class="fas fa-layer-group"></i> Group</button>
-    </div>
-    <div class="dtm-it-section-body" data-parent-id="${id}" data-parent-section="then">${thenHtml}</div>
-  </div>
-  <div class="dtm-it-block-section" data-parent-id="${id}" data-parent-section="else">
-    <div class="dtm-it-section-bar" style="padding-left:${childIndent}px">
-      <span class="dtm-it-section-label">ELSE</span>
-      <button type="button" data-action="addAttributeHere" data-parent-id="${id}" data-parent-section="else"><i class="fas fa-plus"></i> Attr</button>
-      <button type="button" data-action="addConditionalHere" data-parent-id="${id}" data-parent-section="else"><i class="fas fa-code-branch"></i> Cond</button>
-      <button type="button" data-action="addGroupHere" data-parent-id="${id}" data-parent-section="else"><i class="fas fa-layer-group"></i> Group</button>
-    </div>
-    <div class="dtm-it-section-body" data-parent-id="${id}" data-parent-section="else">${elseHtml}</div>
-  </div>
+${branchSections.join("\n")}
 </div>`;
-  }
-
-  _renderCondEditor(actionId, cond) {
-    const id = _esc(actionId);
-    const dieOptions = DIE_OPTIONS.map(d =>
-      `<option value="${d}" ${cond.die === d ? "selected" : ""}>${d}</option>`
-    ).join("");
-
-    const modeFields = cond.mode === "percent"
-      ? `<label>Chance (%): <input type="number" data-field="condPercent" data-action-id="${id}" min="1" max="100" value="${cond.percent ?? 50}" style="width:60px" /></label>`
-      : `<label>Die: <select data-field="condDie" data-action-id="${id}">${dieOptions}</select></label>
-         <label>Range:
-           <input type="number" data-field="condLow" data-action-id="${id}" min="1" value="${cond.low ?? 1}" style="width:50px" />
-           –
-           <input type="number" data-field="condHigh" data-action-id="${id}" min="1" value="${cond.high ?? 1}" style="width:50px" />
-         </label>`;
-
-    return `<div class="dtm-it-cond-editor" data-action-id="${id}">
-  <div class="dtm-it-cond-editor-inner">
-    <label class="dtm-radio-label"><input type="radio" name="condMode-${id}" data-field="condMode" data-action-id="${id}" value="percent" ${cond.mode === "percent" ? "checked" : ""} /> Percent</label>
-    <label class="dtm-radio-label"><input type="radio" name="condMode-${id}" data-field="condMode" data-action-id="${id}" value="dice" ${cond.mode === "dice" ? "checked" : ""} /> Dice</label>
-    ${modeFields}
-    <button type="button" class="dtm-icon-btn" data-action="closeConditional" data-action-id="${id}">Done</button>
-  </div>
-</div>`;
-  }
-
-  _summarizeCondition(condition) {
-    if (!condition) return "50% chance";
-    if (condition.mode === "percent") return `${condition.percent ?? 50}% chance`;
-    if (condition.mode === "dice") {
-      const die = condition.die ?? "d6";
-      const low = condition.low ?? 1;
-      const high = condition.high ?? 1;
-      return low === high ? `${die} = ${low}` : `${die} (${low}–${high})`;
-    }
-    return "condition";
   }
 
   // ---- Attribute browser -----------------------------------------------------
@@ -486,7 +499,6 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
   // ---- Drag-and-drop ---------------------------------------------------------
 
   _setupDragDrop(tree) {
-    // Only make an element draggable when the user grabs its handle
     tree.addEventListener("pointerdown", ev => {
       const handle = ev.target.closest(".dtm-drag-handle");
       if (!handle) return;
@@ -522,7 +534,6 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     for (const el of elements) {
       if (el.classList.contains("dtm-it-section-body")) return el;
       if (el.classList.contains("dtm-it-group-body")) return el;
-      // Hovering over the section bar should target the section body below it
       if (el.classList.contains("dtm-it-block-section")) {
         return el.querySelector(".dtm-it-section-body") ?? el;
       }
@@ -617,7 +628,6 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     tree.querySelectorAll(".dtm-drop-line").forEach(el => el.remove());
     tree.querySelectorAll(".dtm-drag-over").forEach(el => el.classList.remove("dtm-drag-over"));
     tree.querySelectorAll(".dtm-dragging").forEach(el => el.classList.remove("dtm-dragging"));
-    // Remove any stray draggable attributes
     tree.querySelectorAll("[draggable='true']").forEach(el => el.removeAttribute("draggable"));
   }
 
@@ -627,8 +637,9 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     for (const action of (actions ?? [])) {
       if (action.id === id) { fn(action); return true; }
       if (this._findAndMutate(action.children, id, fn)) return true;
-      if (this._findAndMutate(action.thenActions, id, fn)) return true;
-      if (this._findAndMutate(action.elseActions, id, fn)) return true;
+      for (const branch of (action.branches ?? [])) {
+        if (this._findAndMutate(branch.actions, id, fn)) return true;
+      }
     }
     return false;
   }
@@ -637,8 +648,9 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     for (let i = (actions ?? []).length - 1; i >= 0; i--) {
       if (actions[i].id === id) { actions.splice(i, 1); return true; }
       if (this._removeFromActions(actions[i].children, id)) return true;
-      if (this._removeFromActions(actions[i].thenActions, id)) return true;
-      if (this._removeFromActions(actions[i].elseActions, id)) return true;
+      for (const branch of (actions[i].branches ?? [])) {
+        if (this._removeFromActions(branch.actions, id)) return true;
+      }
     }
     return false;
   }
@@ -647,8 +659,9 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     for (let i = 0; i < (actions ?? []).length; i++) {
       if (actions[i].id === id) { fn(actions.splice(i, 1)[0]); return true; }
       if (this._extractFromActions(actions[i].children, id, fn)) return true;
-      if (this._extractFromActions(actions[i].thenActions, id, fn)) return true;
-      if (this._extractFromActions(actions[i].elseActions, id, fn)) return true;
+      for (const branch of (actions[i].branches ?? [])) {
+        if (this._extractFromActions(branch.actions, id, fn)) return true;
+      }
     }
     return false;
   }
@@ -657,8 +670,9 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     if (!action) return false;
     if (action.id === id) return true;
     for (const child of (action.children ?? [])) if (this._containsId(child, id)) return true;
-    for (const child of (action.thenActions ?? [])) if (this._containsId(child, id)) return true;
-    for (const child of (action.elseActions ?? [])) if (this._containsId(child, id)) return true;
+    for (const branch of (action.branches ?? [])) {
+      for (const child of (branch.actions ?? [])) if (this._containsId(child, id)) return true;
+    }
     return false;
   }
 
@@ -668,12 +682,15 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     this._findAndMutate(rootActions, parentId, action => { found = action; });
     if (!found) return null;
     if (found.type === "group") return found.children ?? (found.children = []);
-    if (parentSection === "else") return found.elseActions ?? (found.elseActions = []);
-    return found.thenActions ?? (found.thenActions = []);
+    if (found.type === "conditional") {
+      const branch = (found.branches ?? []).find(b => b.id === parentSection);
+      if (branch) return branch.actions ?? (branch.actions = []);
+      return null;
+    }
+    return null;
   }
 
   _moveAction(rootActions, actionId, targetParentId, targetParentSection, insertIndex) {
-    // Prevent dropping into own descendant
     if (targetParentId) {
       if (targetParentId === actionId) return false;
       let actionRef = null;
@@ -755,6 +772,7 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
       this._findAndMutate(config.actions, actionId, a => { a.writeMode = target.value; });
       await this._saveConfig(config);
       this._recordUndo("editWriteMode", before);
+      this.render();
       return;
     }
     if (field === "attrSourceType") {
@@ -774,6 +792,19 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
       this._recordUndo("editAttrValue", before);
       return;
     }
+    if (field === "attrAppendMode") {
+      this._findAndMutate(config.actions, actionId, a => { a.appendMode = target.value; });
+      await this._saveConfig(config);
+      this._recordUndo("editAppendMode", before);
+      this.render();
+      return;
+    }
+    if (field === "attrAppendSeparator") {
+      this._findAndMutate(config.actions, actionId, a => { a.appendSeparator = target.value; });
+      await this._saveConfig(config);
+      this._recordUndo("editAppendSep", before);
+      return;
+    }
     if (field === "groupLabel") {
       this._findAndMutate(config.actions, actionId, a => { a.label = target.value; });
       await this._saveConfig(config);
@@ -786,50 +817,40 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
       this._recordUndo("editCondLabel", before);
       return;
     }
-    if (field === "condMode") {
-      this._findAndMutate(config.actions, actionId, a => {
-        if (!a.condition) a.condition = { mode: "percent", percent: 50 };
-        a.condition.mode = target.value;
-      });
-      await this._saveConfig(config);
-      this._recordUndo("editCondMode", before);
-      this.render();
-      return;
-    }
-    if (field === "condPercent") {
-      this._findAndMutate(config.actions, actionId, a => {
-        if (!a.condition) a.condition = { mode: "percent", percent: 50 };
-        a.condition.percent = parseInt(target.value) || 50;
-      });
-      await this._saveConfig(config);
-      this._recordUndo("editCondPercent", before);
-      return;
-    }
     if (field === "condDie") {
-      this._findAndMutate(config.actions, actionId, a => {
-        if (!a.condition) a.condition = {};
-        a.condition.die = target.value;
-      });
+      this._findAndMutate(config.actions, actionId, a => { a.die = target.value; });
       await this._saveConfig(config);
       this._recordUndo("editCondDie", before);
       return;
     }
-    if (field === "condLow") {
+
+    // Branch fields (require data-branch-id)
+    const branchId = target.dataset.branchId;
+    if (!branchId) return;
+
+    const updateBranch = (fn) => {
       this._findAndMutate(config.actions, actionId, a => {
-        if (!a.condition) a.condition = {};
-        a.condition.low = parseInt(target.value) || 1;
+        const branch = (a.branches ?? []).find(b => b.id === branchId);
+        if (branch) fn(branch);
       });
+    };
+
+    if (field === "branchLow") {
+      updateBranch(b => { b.low = parseInt(target.value) || 1; });
       await this._saveConfig(config);
-      this._recordUndo("editCondLow", before);
+      this._recordUndo("editBranchLow", before);
       return;
     }
-    if (field === "condHigh") {
-      this._findAndMutate(config.actions, actionId, a => {
-        if (!a.condition) a.condition = {};
-        a.condition.high = parseInt(target.value) || 1;
-      });
+    if (field === "branchHigh") {
+      updateBranch(b => { b.high = parseInt(target.value) || 1; });
       await this._saveConfig(config);
-      this._recordUndo("editCondHigh", before);
+      this._recordUndo("editBranchHigh", before);
+      return;
+    }
+    if (field === "branchLabel") {
+      updateBranch(b => { b.label = target.value; });
+      await this._saveConfig(config);
+      this._recordUndo("editBranchLabel", before);
       return;
     }
   }
@@ -859,9 +880,11 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
       id: foundry.utils.randomID(),
       type: "conditional",
       label: "Conditional",
-      condition: { mode: "percent", percent: 50 },
-      thenActions: [],
-      elseActions: []
+      die: "d6",
+      branches: [
+        { id: foundry.utils.randomID(), label: "Branch 1", low: 1, high: 3, actions: [] },
+        { id: foundry.utils.randomID(), label: "Branch 2", low: 4, high: 6, actions: [] }
+      ]
     });
     await this._saveConfig(config);
     this._recordUndo("addConditional", before);
@@ -886,27 +909,52 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     this.render();
   }
 
+  static async #onAddBranch(_ev, target) {
+    const actionId = target.dataset.actionId;
+    if (!actionId) return;
+    const before = this._getState();
+    const config = this._getConfig();
+    this._findAndMutate(config.actions, actionId, a => {
+      if (a.type !== "conditional") return;
+      if (!a.branches) a.branches = [];
+      const n = a.branches.filter(b => !b.isElse).length;
+      a.branches.push({
+        id: foundry.utils.randomID(),
+        label: `Branch ${n + 1}`,
+        low: 1,
+        high: 1,
+        actions: []
+      });
+    });
+    await this._saveConfig(config);
+    this._recordUndo("addBranch", before);
+    this.render();
+  }
+
+  static async #onDeleteBranch(_ev, target) {
+    const actionId = target.dataset.actionId;
+    const branchId = target.dataset.branchId;
+    if (!actionId || !branchId) return;
+    const before = this._getState();
+    const config = this._getConfig();
+    this._findAndMutate(config.actions, actionId, a => {
+      if (a.type === "conditional" && a.branches) {
+        a.branches = a.branches.filter(b => b.id !== branchId);
+      }
+    });
+    await this._saveConfig(config);
+    this._recordUndo("deleteBranch", before);
+    this.render();
+  }
+
   static async #onDeleteAction(_ev, target) {
     const id = target.dataset.actionId ?? target.closest("[data-action-id]")?.dataset.actionId;
     if (!id) return;
     const before = this._getState();
     const config = this._getConfig();
     this._removeFromActions(config.actions, id);
-    if (this._expandedCondId === id) this._expandedCondId = null;
     await this._saveConfig(config);
     this._recordUndo("deleteAction", before);
-    this.render();
-  }
-
-  static #onEditConditional(_ev, target) {
-    const id = target.dataset.actionId;
-    if (!id) return;
-    this._expandedCondId = this._expandedCondId === id ? null : id;
-    this.render();
-  }
-
-  static #onCloseConditional() {
-    this._expandedCondId = null;
     this.render();
   }
 
