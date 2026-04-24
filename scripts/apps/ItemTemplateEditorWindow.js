@@ -39,8 +39,6 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     this.table = options.table;
     this.undoManager = new UndoManager();
     this._attributePaths = [];
-    this._attrFilter = "";
-    this._attrFilterDebounce = null;
     this._drag = null;
     this._dropTarget = null;
     this.undoManager.takeSnapshot(this._getState());
@@ -57,7 +55,6 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
       addBranch:          ItemTemplateEditorWindow.#onAddBranch,
       deleteBranch:       ItemTemplateEditorWindow.#onDeleteBranch,
       deleteAction:       ItemTemplateEditorWindow.#onDeleteAction,
-      addAttrFromBrowser: ItemTemplateEditorWindow.#onAddAttrFromBrowser,
       addAttributeHere:   ItemTemplateEditorWindow.#onAddAttributeHere,
       addConditionalHere: ItemTemplateEditorWindow.#onAddConditionalHere,
       addGroupHere:       ItemTemplateEditorWindow.#onAddGroupHere,
@@ -189,7 +186,6 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     }
 
     const actionTreeHtml = await this._buildTreeHtml(config.actions, null, null, 0);
-    const attrRows = this._buildAttributeRows(this._attrFilter);
 
     const baseItemModes = ["none", "fixed", "table"].map(v => ({
       value: v, label: { none: "None", fixed: "Fixed Item", table: "Roll from Table" }[v],
@@ -210,8 +206,6 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
       baseItemModes,
       imgModes,
       actionTreeHtml,
-      attrRows,
-      attrFilter: this._attrFilter,
       canUndo: this.undoManager.canUndo(),
       canRedo: this.undoManager.canRedo()
     };
@@ -427,32 +421,84 @@ ${branchSections.join("\n")}
     return paths;
   }
 
-  _buildAttributeRows(filter) {
-    if (!filter) return this._attributePaths;
-    const lc = filter.toLowerCase();
-    return this._attributePaths.filter(p => p.path.toLowerCase().includes(lc));
-  }
+  // ---- Attribute picker popup ------------------------------------------------
 
-  _refreshAttrPane() {
-    const list = this.element?.querySelector(".dtm-it-attr-list");
-    if (!list) return;
-    const rows = this._buildAttributeRows(this._attrFilter);
-    if (!rows.length) {
-      const msg = this._attributePaths.length
-        ? "No attributes match your filter."
-        : (this._getConfig().itemType ? "Loading attributes…" : "Select an item type to browse attributes.");
-      list.innerHTML = `<div class="dtm-region-empty">${msg}</div>`;
+  _showAttrPicker(anchorEl, parentId, parentSection) {
+    document.querySelector(".dtm-attr-picker")?.remove();
+
+    if (!this._attributePaths.length) {
+      ui.notifications.warn("Select an item type first to browse attributes.");
       return;
     }
-    list.innerHTML = rows.map(r => `
-      <div class="dtm-it-attr-row" data-path="${_esc(r.path)}">
-        <span class="dtm-it-attr-path" title="${_esc(r.path)}">${_esc(r.path)}</span>
-        <button type="button" class="dtm-it-attr-add" data-action="addAttrFromBrowser"
-                data-path="${_esc(r.path)}" title="Add to tree">
-          <i class="fas fa-plus"></i>
-        </button>
+
+    const renderItems = (filter) => {
+      const paths = filter
+        ? this._attributePaths.filter(p => p.path.toLowerCase().includes(filter.toLowerCase()))
+        : this._attributePaths;
+      if (!paths.length) return `<div class="dtm-attr-picker-empty">No matches</div>`;
+      return paths.map(r =>
+        `<div class="dtm-attr-picker-item" data-path="${_esc(r.path)}" title="${_esc(r.path)}">${_esc(r.path)}</div>`
+      ).join("");
+    };
+
+    const picker = document.createElement("div");
+    picker.className = "dtm-attr-picker";
+    picker.innerHTML = `
+      <div class="dtm-attr-picker-search">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Filter attributes…" />
       </div>
-    `).join("");
+      <div class="dtm-attr-picker-list">${renderItems("")}</div>
+    `;
+
+    const rect = anchorEl.getBoundingClientRect();
+    const pickerW = 280;
+    let left = rect.left;
+    if (left + pickerW > window.innerWidth - 8) left = window.innerWidth - pickerW - 8;
+    let top = rect.bottom + 4;
+    picker.style.cssText = `left:${left}px;top:${top}px`;
+    document.body.appendChild(picker);
+    picker.querySelector("input").focus();
+
+    picker.querySelector("input").addEventListener("input", ev => {
+      picker.querySelector(".dtm-attr-picker-list").innerHTML = renderItems(ev.target.value);
+    });
+
+    picker.addEventListener("click", async ev => {
+      const item = ev.target.closest(".dtm-attr-picker-item");
+      if (!item) return;
+      picker.remove();
+      document.removeEventListener("pointerdown", outsideHandler, { capture: true });
+      await this._addAttribute(item.dataset.path, parentId, parentSection);
+    });
+
+    const outsideHandler = (ev) => {
+      if (!picker.contains(ev.target)) {
+        picker.remove();
+        document.removeEventListener("pointerdown", outsideHandler, { capture: true });
+      }
+    };
+    setTimeout(() => document.addEventListener("pointerdown", outsideHandler, { capture: true }), 50);
+  }
+
+  async _addAttribute(path, parentId, parentSection) {
+    const before = this._getState();
+    const config = this._getConfig();
+    const arr = this._resolveTargetArray(config.actions, parentId || null, parentSection || null);
+    if (!arr) return;
+    arr.push({
+      id: foundry.utils.randomID(),
+      type: "attribute",
+      path,
+      writeMode: "overwrite",
+      sourceType: "text",
+      value: "",
+      tableUuid: null,
+      tableName: null
+    });
+    await this._saveConfig(config);
+    this._recordUndo("addAttr", before);
+    this.render();
   }
 
   // ---- Render ----------------------------------------------------------------
@@ -481,15 +527,6 @@ ${branchSections.join("\n")}
         ev.stopPropagation();
         ev.target.blur();
       }
-    });
-
-    const filterInput = html.querySelector(".dtm-it-attr-filter");
-    filterInput?.addEventListener("input", ev => {
-      clearTimeout(this._attrFilterDebounce);
-      this._attrFilterDebounce = setTimeout(() => {
-        this._attrFilter = ev.target.value;
-        this._refreshAttrPane();
-      }, 150);
     });
 
     const tree = html.querySelector(".dtm-it-tree");
@@ -958,46 +995,10 @@ ${branchSections.join("\n")}
     this.render();
   }
 
-  static async #onAddAttrFromBrowser(_ev, target) {
-    const path = target.dataset.path;
-    if (!path) return;
-    const before = this._getState();
-    const config = this._getConfig();
-    config.actions.push({
-      id: foundry.utils.randomID(),
-      type: "attribute",
-      path,
-      writeMode: "overwrite",
-      sourceType: "text",
-      value: "",
-      tableUuid: null,
-      tableName: null
-    });
-    await this._saveConfig(config);
-    this._recordUndo("addAttr", before);
-    this.render();
-  }
-
-  static async #onAddAttributeHere(_ev, target) {
+  static async #onAddAttributeHere(ev, target) {
     const parentId = target.dataset.parentId || null;
     const parentSection = target.dataset.parentSection || null;
-    const before = this._getState();
-    const config = this._getConfig();
-    const arr = this._resolveTargetArray(config.actions, parentId, parentSection);
-    if (!arr) return;
-    arr.push({
-      id: foundry.utils.randomID(),
-      type: "attribute",
-      path: "name",
-      writeMode: "overwrite",
-      sourceType: "text",
-      value: "",
-      tableUuid: null,
-      tableName: null
-    });
-    await this._saveConfig(config);
-    this._recordUndo("addAttrHere", before);
-    this.render();
+    this._showAttrPicker(target, parentId, parentSection);
   }
 
   static async #onAddConditionalHere(_ev, target) {

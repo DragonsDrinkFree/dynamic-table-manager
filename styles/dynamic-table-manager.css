@@ -2190,15 +2190,12 @@ input.dtm-col-range:disabled {
 
 .dtm-it-window .window-content { padding: 0; overflow: hidden; }
 
-.dtm-it-container { display: flex; height: 100%; overflow: hidden; }
-
-/* ── Left pane ── */
-.dtm-it-left {
-  flex: 1 1 0;
+/* Single-column layout — same pattern as .dtm-editor-container */
+.dtm-it-container {
   display: flex;
   flex-direction: column;
+  height: 100%;
   overflow: hidden;
-  border-right: 1px solid var(--color-border-light-tertiary, #444);
 }
 
 /* ── Config header ── */
@@ -2232,14 +2229,12 @@ input.dtm-col-range:disabled {
 .dtm-it-generate-btn:hover { background: rgba(80, 180, 100, 0.3); }
 
 /* ── Action tree scroll area ── */
+/* Block layout (not flex) so children overflow rather than shrink — same pattern as .dtm-row-list */
 .dtm-it-tree {
-  flex: 1 1 0;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 30px;
 }
 
 /* ── Attribute row (column layout) ── */
@@ -2251,6 +2246,7 @@ input.dtm-col-range:disabled {
   min-height: 30px;
   border: 1px solid transparent;
   border-radius: 3px;
+  margin-bottom: 2px;
 }
 
 .dtm-it-action-row:hover {
@@ -2299,6 +2295,7 @@ input.dtm-col-range:disabled {
   border: 1px solid var(--color-border-light-tertiary, #444);
   border-radius: 4px;
   overflow: hidden;
+  margin-bottom: 2px;
 }
 
 .dtm-it-group-block { border-left: 3px solid rgba(140, 200, 100, 0.5); }
@@ -2320,9 +2317,6 @@ input.dtm-col-range:disabled {
 /* Group body: children drop zone */
 .dtm-it-group-body {
   background: rgba(0, 0, 0, 0.07);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   padding: 2px 0;
   min-height: 32px;
 }
@@ -2350,9 +2344,6 @@ input.dtm-col-range:disabled {
 }
 
 .dtm-it-section-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   padding: 2px 0;
   min-height: 30px;
 }
@@ -2450,33 +2441,33 @@ input.dtm-col-range:disabled {
 .dtm-it-empty-state i { font-size: 32px; margin-bottom: 8px; opacity: 0.3; }
 .dtm-it-empty-state p { margin: 0; font-size: 12px; line-height: 1.5; }
 
-/* ── Right pane: Attribute Browser ── */
-.dtm-it-right { flex: 0 0 280px; display: flex; flex-direction: column; overflow: hidden; }
-
-.dtm-it-attr-header {
+/* ── Attribute picker popup ── */
+.dtm-attr-picker {
+  position: fixed;
+  z-index: 10000;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  font-size: 11px;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--color-text-light-tertiary, #888);
-  border-bottom: 1px solid var(--color-border-light-tertiary, #444);
-  flex-shrink: 0;
+  flex-direction: column;
+  width: 280px;
+  max-height: 320px;
+  background: var(--color-bg-option, #1e1e2e);
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 5px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
 
-.dtm-it-attr-search {
+.dtm-attr-picker-search {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--color-border-light-tertiary, #444);
   flex-shrink: 0;
 }
 
-.dtm-it-attr-filter {
+.dtm-attr-picker-search i { opacity: 0.45; font-size: 11px; flex-shrink: 0; }
+
+.dtm-attr-picker-search input {
   flex: 1;
   background: none;
   border: none;
@@ -2485,52 +2476,33 @@ input.dtm-col-range:disabled {
   font-size: 12px;
 }
 
-.dtm-it-attr-list {
-  flex: 1 1 0;
+.dtm-attr-picker-list {
+  flex: 1;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
   padding: 3px;
 }
 
-.dtm-it-attr-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
+.dtm-attr-picker-item {
+  padding: 4px 8px;
   border-radius: 3px;
-  border: 1px solid transparent;
-}
-
-.dtm-it-attr-row:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--color-border-light-tertiary, #444);
-}
-
-.dtm-it-attr-path {
-  flex: 1;
   font-family: var(--font-mono, "Courier New", monospace);
   font-size: 11px;
   color: var(--color-text-light-secondary, #ccc);
+  cursor: pointer;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.dtm-it-attr-add {
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px 5px;
-  border-radius: 3px;
-  color: var(--color-text-light-tertiary, #888);
+.dtm-attr-picker-item:hover {
+  background: rgba(100, 160, 255, 0.15);
+  color: var(--color-text-light-primary, #eee);
+}
+
+.dtm-attr-picker-empty {
+  padding: 10px 8px;
   font-size: 11px;
-  line-height: 1;
-}
-
-.dtm-it-attr-add:hover {
-  color: rgba(130, 220, 140, 1);
-  background: rgba(80, 200, 100, 0.12);
+  color: var(--color-text-light-tertiary, #777);
+  font-style: italic;
 }
 
