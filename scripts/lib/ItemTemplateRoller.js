@@ -145,7 +145,9 @@ export class ItemTemplateRoller {
       case "colon":  return `${existing}: ${value}`;
       case "list":   return `${existing}\n- ${value}`;
       case "custom": return `${existing}${customSeparator ?? ""}${value}`;
-      default:       return `${existing}\n\n${value}`;
+      // "newline": emit an HTML blank line so it actually shows in rich-text
+      // fields (description, notes); plain `\n\n` is invisible whitespace there.
+      default:       return `${existing}<br><br>${value}`;
     }
   }
 
@@ -158,7 +160,7 @@ export class ItemTemplateRoller {
       case "colon":  return `${value}: ${existing}`;
       case "list":   return `- ${value}\n${existing}`;
       case "custom": return `${value}${customSeparator ?? ""}${existing}`;
-      default:       return `${value}\n\n${existing}`;
+      default:       return `${value}<br><br>${existing}`;
     }
   }
 
@@ -180,11 +182,73 @@ export class ItemTemplateRoller {
       if (!action.tableUuid) return null;
       const result = await ItemTemplateRoller._rollTableRecursive(action.tableUuid);
       if (!result) return null;
-      if (result.type === "text") return result.value;
-      if (result.type === "document") return result.doc?.name ?? null;
+
+      const tableField = action.tableField ?? "name";
+      let name, description;
+      if (result.type === "text") {
+        // Text-type TableResult: pull both the display text and the result's
+        // own `description` field (Foundry stores them on the TableResult itself).
+        name = result.value ?? "";
+        description = result.description ?? "";
+      } else {
+        // Document-type result: name from the doc, description from the doc's system fields.
+        name = result.doc?.name ?? "";
+        description = ItemTemplateRoller._getDescription(result.doc);
+      }
+
+      if (tableField === "description") return description || name;     // fall back to name if no desc
+      if (tableField === "both")        return ItemTemplateRoller._joinNameAndDesc(name, description);
+      return name;
     }
 
     return null;
+  }
+
+  /**
+   * Pull a description string out of a document. Tries common paths used across systems.
+   * Returns the first non-empty STRING found — `??` alone is unsafe here because
+   * `system.description.value` is often `""` on fresh items and we want to keep searching.
+   */
+  static _getDescription(doc) {
+    if (!doc) return "";
+
+    const paths = [
+      "system.description.value",         // dnd5e, pf2e, swade, dsa5, most modern systems
+      "system.description.short",         // some pf2e items
+      "system.details.description.value",
+      "system.details.biography.value",   // actor biographies
+      "system.notes.value",
+      "system.notes",
+      "system.description",               // simple-worldbuilding style (plain string)
+      "description"                       // top-level fallback
+    ];
+
+    for (const path of paths) {
+      const val = foundry.utils.getProperty(doc, path);
+      if (typeof val === "string" && val.trim()) return val;
+    }
+
+    console.warn(
+      `DTM ItemTemplate: no description found on "${doc.name}". ` +
+      `Tried: ${paths.join(", ")}. Inspect doc.system in the console to find the right path.`,
+      doc
+    );
+    return "";
+  }
+
+  /**
+   * Combine `Name` and `Description` for the "Both" table-field mode with tight spacing.
+   * - If the description already starts with a block element (`<p>`, `<div>`, …), the block's
+   *   own line-start handles the break — adding `<br>` would stack on top of its margin.
+   * - Otherwise emit a single `<br>` so plain-text descriptions still drop to a new line.
+   * Result: roughly one visible line gap regardless of whether the source is plain or HTML.
+   */
+  static _joinNameAndDesc(name, description) {
+    if (!description) return name;
+    const trimmed = description.replace(/^\s+/, "");
+    const startsWithBlock = /^<(p|div|h\d|ul|ol|li|blockquote|pre|figure|table|section|article)\b/i.test(trimmed);
+    const sep = startsWithBlock ? "" : "<br>";
+    return `${name}:${sep}${trimmed}`;
   }
 
   // ---------------------------------------------------------------------------
@@ -216,10 +280,12 @@ export class ItemTemplateRoller {
 
   /**
    * Roll a table and follow any chained RollTable documents recursively until
-   * a non-table result is reached.
+   * a non-table result is reached. Text results carry along the TableResult's
+   * own `description` field for use when the row is set to "Desc" or "Both".
+   *
    * @param {string} tableUuid
    * @param {number} [depth=0]  guard against infinite loops
-   * @returns {Promise<{type:"text",value:string}|{type:"document",doc:foundry.abstract.Document}|null>}
+   * @returns {Promise<{type:"text",value:string,description:string}|{type:"document",doc:foundry.abstract.Document}|null>}
    */
   static async _rollTableRecursive(tableUuid, depth = 0) {
     if (depth > 20) {
@@ -234,15 +300,18 @@ export class ItemTemplateRoller {
     const result = draw.results?.[0];
     if (!result) return null;
 
+    const resultName = result.name ?? result.text ?? "";
+    const resultDesc = result.description ?? "";
+
     if (result.type === CONST.TABLE_RESULT_TYPES.DOCUMENT) {
       const doc = await fromUuid(result.documentUuid).catch(() => null);
       if (doc instanceof RollTable) {
         return ItemTemplateRoller._rollTableRecursive(doc.uuid, depth + 1);
       }
-      return doc ? { type: "document", doc } : { type: "text", value: result.name ?? "" };
+      return doc ? { type: "document", doc } : { type: "text", value: resultName, description: resultDesc };
     }
 
-    return { type: "text", value: result.name ?? "" };
+    return { type: "text", value: resultName, description: resultDesc };
   }
 
   // ---------------------------------------------------------------------------

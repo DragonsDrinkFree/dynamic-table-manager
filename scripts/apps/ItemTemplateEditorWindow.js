@@ -29,6 +29,12 @@ const APPEND_OPTIONS = [
   ["custom",  "Custom"]
 ];
 
+const TABLE_FIELDS = [
+  ["name",        "Name"],
+  ["description", "Desc"],
+  ["both",        "Both"]
+];
+
 const BASE_ITEM_MODE_LABELS = { none: "None", fixed: "Fixed Item", table: "Roll from Table" };
 const IMG_MODE_LABELS       = { none: "None", fixed: "Fixed Path", folder: "Random from Folder" };
 
@@ -138,6 +144,10 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     this._attributePaths = [];
     this._drag = null;
     this._dropTarget = null;
+    /** @type {Set<string>} IDs of collapsed groups/conditionals — ephemeral UI state. */
+    this._collapsed = new Set();
+    /** @type {number|null} Scroll position captured before a full render so we can restore it after. */
+    this._savedScrollTop = null;
     // Display name caches keyed by uuid — avoid re-fetching on every render.
     this._nameCache = {
       base:      { uuid: null, name: null },
@@ -158,6 +168,7 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
       deleteBranch:       ItemTemplateEditorWindow.#onDeleteBranch,
       deleteAction:       ItemTemplateEditorWindow.#onDeleteAction,
       duplicateAction:    ItemTemplateEditorWindow.#onDuplicateAction,
+      toggleCollapse:     ItemTemplateEditorWindow.#onToggleCollapse,
       addAttributeHere:   ItemTemplateEditorWindow.#onAddAttributeHere,
       addConditionalHere: ItemTemplateEditorWindow.#onAddConditional,
       addGroupHere:       ItemTemplateEditorWindow.#onAddGroup,
@@ -181,6 +192,13 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
 
   get id()    { return `dtm-it-editor-${this.table.id}`; }
   get title() { return `Item Template: ${this.table.name}`; }
+
+  /** Capture scroll before a full render so `_onRender` can restore it. */
+  render(...args) {
+    const tree = this.element?.querySelector?.(".dtm-it-tree");
+    if (tree) this._savedScrollTop = tree.scrollTop;
+    return super.render(...args);
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   //  Config I/O
@@ -475,16 +493,25 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
       appendHtml = `<select class="dtm-it-col-append" data-field="attrAppendMode" data-action-id="${id}" title="Separator">${opts}</select>${customSep}`;
     }
 
-    const valueHtml = sourceType === "text"
-      ? `<input class="dtm-it-col-value" type="text" data-field="attrValue" data-action-id="${id}" value="${_esc(action.value ?? "")}" placeholder="Value…" />`
-      : `<span class="dtm-it-table-name dtm-it-col-value" title="${_esc(action.tableName) || "No table"}">${action.tableName ? _esc(action.tableName) : "<em>No table</em>"}</span>
+    let valueHtml;
+    if (sourceType === "text") {
+      valueHtml = `<input class="dtm-it-col-value" type="text" data-field="attrValue" data-action-id="${id}" value="${_esc(action.value ?? "")}" placeholder="Value…" />`;
+    } else {
+      const tableField = action.tableField ?? "name";
+      const tfOpts = TABLE_FIELDS
+        .map(([v, l]) => `<option value="${v}" ${tableField === v ? "selected" : ""}>${l}</option>`)
+        .join("");
+      valueHtml = `<select class="dtm-it-col-tfield" data-field="attrTableField" data-action-id="${id}" title="Field to extract from rolled result">${tfOpts}</select>
+         <span class="dtm-it-table-name dtm-it-col-value" title="${_esc(action.tableName) || "No table"}">${action.tableName ? _esc(action.tableName) : "<em>No table</em>"}</span>
          <button type="button" class="dtm-icon-btn" data-action="pickAttrTable" data-action-id="${id}" title="Pick table"><i class="fas fa-table"></i></button>`;
+    }
 
     return `<div class="dtm-it-action-row" data-action-id="${id}" data-parent-id="${pid}" data-parent-section="${ps}" data-depth="${depth}" style="padding-left:${indent}px">
   <span class="dtm-drag-handle" data-drag-id="${id}" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></span>
   <input class="dtm-it-col-path" type="text" data-field="attrPath" data-action-id="${id}" value="${path}" placeholder="attribute.path" title="${path}" />
   <select class="dtm-it-col-wmode" data-field="attrWriteMode" data-action-id="${id}" title="Write mode">${writeOpts}</select>
   ${appendHtml}
+  <span class="dtm-it-col-divider" aria-hidden="true"></span>
   <select class="dtm-it-col-srctype" data-field="attrSourceType" data-action-id="${id}" title="Source type">
     <option value="text"  ${sourceType === "text"  ? "selected" : ""}>Text</option>
     <option value="table" ${sourceType === "table" ? "selected" : ""}>Table</option>
@@ -506,7 +533,10 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     return `<div class="dtm-it-block dtm-it-group-block" data-action-id="${id}" data-parent-id="${pid}" data-parent-section="${ps}">
   <div class="dtm-it-block-header" style="padding-left:${indent}px">
     <span class="dtm-drag-handle" data-drag-id="${id}" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></span>
-    <i class="fas fa-layer-group dtm-it-block-icon"></i>
+    <span class="dtm-it-collapse-toggle" data-action="toggleCollapse" data-action-id="${id}" title="Collapse / expand">
+      <i class="fas fa-caret-down dtm-it-collapse-chevron"></i>
+      <i class="fas fa-layer-group dtm-it-block-icon"></i>
+    </span>
     <input class="dtm-it-col-label" type="text" data-field="groupLabel" data-action-id="${id}" value="${label}" placeholder="Group label…" />
     <button type="button" class="dtm-icon-btn"            data-action="duplicateAction" data-action-id="${id}" title="Duplicate group (with children)"><i class="fas fa-clone"></i></button>
     <button type="button" class="dtm-icon-btn dtm-danger" data-action="deleteAction"    data-action-id="${id}" title="Remove group"><i class="fas fa-trash"></i></button>
@@ -561,7 +591,10 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
     return `<div class="dtm-it-block dtm-it-cond-block" data-action-id="${id}" data-parent-id="${pid}" data-parent-section="${ps}">
   <div class="dtm-it-block-header dtm-it-cond-header" style="padding-left:${indent}px">
     <span class="dtm-drag-handle" data-drag-id="${id}" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></span>
-    <i class="fas fa-code-branch dtm-it-block-icon"></i>
+    <span class="dtm-it-collapse-toggle" data-action="toggleCollapse" data-action-id="${id}" title="Collapse / expand">
+      <i class="fas fa-caret-down dtm-it-collapse-chevron"></i>
+      <i class="fas fa-code-branch dtm-it-block-icon"></i>
+    </span>
     <input type="text" class="dtm-it-cond-die" data-field="condDie" data-action-id="${id}" value="${_esc(die)}" placeholder="d6" title="Die formula (e.g. d6, 2d6, d100)" />
     <input class="dtm-it-col-label dtm-it-cond-label" type="text" data-field="condLabel" data-action-id="${id}" value="${label}" placeholder="Label…" />
     <button type="button" class="dtm-icon-btn"               data-action="addBranch"       data-action-id="${id}" title="Add range branch"><i class="fas fa-plus"></i> Branch</button>
@@ -674,7 +707,8 @@ ${branchSections.join("\n")}
         sourceType: "text",
         value: "",
         tableUuid: null,
-        tableName: null
+        tableName: null,
+        tableField: "name"
       });
     });
   }
@@ -703,6 +737,25 @@ ${branchSections.join("\n")}
 
     const tree = html.querySelector(".dtm-it-tree");
     if (tree) this._setupDragDrop(tree);
+
+    this._applyCollapsedState();
+
+    if (tree && this._savedScrollTop != null) {
+      tree.scrollTop = this._savedScrollTop;
+      this._savedScrollTop = null;
+    }
+  }
+
+  /** Re-apply the collapsed UI state to fresh DOM after a render. Prunes stale IDs. */
+  _applyCollapsedState() {
+    if (!this._collapsed.size) return;
+    const root = this.element;
+    if (!root) return;
+    for (const id of [...this._collapsed]) {
+      const block = root.querySelector(`.dtm-it-block[data-action-id="${CSS.escape(id)}"]`);
+      if (block) block.classList.add("dtm-it-collapsed");
+      else this._collapsed.delete(id);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -756,6 +809,46 @@ ${branchSections.join("\n")}
     tree.addEventListener("dragleave", ev => this._onDragLeave(ev, tree));
     tree.addEventListener("drop",      ev => this._onDrop(ev,      tree));
     tree.addEventListener("dragend",   ev => this._onDragEnd(ev,   tree));
+
+    // Manual wheel-scroll while dragging — browsers suppress default
+    // wheel scrolling during HTML5 drag operations.
+    tree.addEventListener("wheel", ev => {
+      if (!this._drag) return;
+      ev.preventDefault();
+      tree.scrollTop += ev.deltaY;
+    }, { passive: false });
+  }
+
+  // Edge auto-scroll while dragging — runs a RAF loop fed by `dragover` Y.
+  _startAutoScroll(tree) {
+    this._stopAutoScroll();
+    const EDGE = 50;       // distance from edge (px) at which scrolling begins
+    const MAX_SPEED = 18;  // max scroll delta per frame at the very edge
+
+    const tick = () => {
+      if (!this._drag) { this._autoScrollRaf = null; return; }
+      const y = this._dragLastY;
+      if (y != null) {
+        const rect = tree.getBoundingClientRect();
+        let dy = 0;
+        if (y < rect.top + EDGE) {
+          dy = -MAX_SPEED * Math.min(1, (rect.top + EDGE - y) / EDGE);
+        } else if (y > rect.bottom - EDGE) {
+          dy =  MAX_SPEED * Math.min(1, (y - (rect.bottom - EDGE)) / EDGE);
+        }
+        if (dy !== 0) tree.scrollTop += dy;
+      }
+      this._autoScrollRaf = requestAnimationFrame(tick);
+    };
+    this._autoScrollRaf = requestAnimationFrame(tick);
+  }
+
+  _stopAutoScroll() {
+    if (this._autoScrollRaf) {
+      cancelAnimationFrame(this._autoScrollRaf);
+      this._autoScrollRaf = null;
+    }
+    this._dragLastY = null;
   }
 
   _clearDragVisuals(tree) {
@@ -763,13 +856,15 @@ ${branchSections.join("\n")}
     tree.querySelectorAll(".dtm-drag-over").forEach(el => el.classList.remove("dtm-drag-over"));
   }
 
-  _onDragStart(ev, _tree) {
+  _onDragStart(ev, tree) {
     const el = ev.target.closest("[data-action-id]");
     if (!el || !el.hasAttribute("draggable")) return;
     const actionId = el.dataset.actionId;
     ev.dataTransfer.effectAllowed = "move";
     ev.dataTransfer.setData("text/plain", actionId);
     this._drag = { actionId };
+    this._dragLastY = ev.clientY;
+    this._startAutoScroll(tree);
     requestAnimationFrame(() => el.classList.add("dtm-dragging"));
   }
 
@@ -798,6 +893,7 @@ ${branchSections.join("\n")}
     if (!this._drag) return;
     ev.preventDefault();
     ev.dataTransfer.dropEffect = "move";
+    this._dragLastY = ev.clientY;
 
     this._clearDragVisuals(tree);
 
@@ -829,6 +925,7 @@ ${branchSections.join("\n")}
 
   async _onDrop(ev, tree) {
     ev.preventDefault();
+    this._stopAutoScroll();
     this._clearDragVisuals(tree);
     tree.querySelectorAll(".dtm-dragging").forEach(el => el.classList.remove("dtm-dragging"));
 
@@ -850,6 +947,7 @@ ${branchSections.join("\n")}
   _onDragEnd(_ev, tree) {
     this._drag = null;
     this._dropTarget = null;
+    this._stopAutoScroll();
     this._clearDragVisuals(tree);
     tree.querySelectorAll(".dtm-dragging").forEach(el => el.classList.remove("dtm-dragging"));
     tree.querySelectorAll("[draggable='true']").forEach(el => el.removeAttribute("draggable"));
@@ -940,6 +1038,15 @@ ${branchSections.join("\n")}
       const dup = this._cloneActionWithNewIds(ref.action);
       ref.array.splice(ref.index + 1, 0, dup);
     });
+  }
+
+  static #onToggleCollapse(_ev, target) {
+    const id = target.dataset.actionId ?? target.closest("[data-action-id]")?.dataset.actionId;
+    if (!id) return;
+    const block = this.element?.querySelector(`.dtm-it-block[data-action-id="${CSS.escape(id)}"]`);
+    if (!block) return;
+    if (this._collapsed.has(id)) { this._collapsed.delete(id); block.classList.remove("dtm-it-collapsed"); }
+    else                          { this._collapsed.add(id);    block.classList.add("dtm-it-collapsed"); }
   }
 
   static async #onAddAttributeHere(_ev, target) {
@@ -1118,6 +1225,13 @@ ${branchSections.join("\n")}
       const id = t.dataset.actionId;
       await this._editConfig(cfg => this._mutateAction(cfg, id, a => { a.appendMode = t.value; }),
         { render: "row", rowId: id });
+    },
+
+    // Affects roll-time output, not the row's visible layout — no re-render needed.
+    attrTableField: async function (t) {
+      const id = t.dataset.actionId;
+      await this._editConfig(cfg => this._mutateAction(cfg, id, a => { a.tableField = t.value; }),
+        { render: "none" });
     },
 
     // Attribute action fields — text only (no DOM update) ──────────────────

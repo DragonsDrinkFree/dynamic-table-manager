@@ -2256,24 +2256,38 @@ input.dtm-col-range:disabled {
 
 /* ── Row column widths ── */
 .dtm-it-col-path {
-  flex: 0.85 1 0;
+  flex: 0.76 1 0;       /* ~10% narrower than the previous 0.85 */
   min-width: 60px;
   font-family: var(--font-mono, "Courier New", monospace);
   font-size: 11px;
 }
 
-.dtm-it-col-wmode   { flex: 0 0 68px; width: 68px; font-size: 11px; }
-.dtm-it-col-srctype { flex: 0 0 66px; width: 66px; font-size: 11px; }
-.dtm-it-col-append  { flex: 0 0 68px; width: 68px; font-size: 11px; }
-.dtm-it-col-sep     { flex: 0 0 52px; width: 52px; font-size: 11px; }
-.dtm-it-cond-die    { flex: 0 0 68px; width: 68px; font-size: 11px; }
+.dtm-it-col-wmode   { flex: 0 0 68px;  width: 68px;  font-size: 11px; }
+.dtm-it-col-srctype { flex: 0 0 66px;  width: 66px;  font-size: 11px; }
+.dtm-it-col-append  { flex: 0 0 68px;  width: 68px;  font-size: 11px; }
+.dtm-it-col-sep     { flex: 0 0 52px;  width: 52px;  font-size: 11px; }
+.dtm-it-col-tfield  { flex: 0 0 100px; width: 100px; font-size: 11px; }
+.dtm-it-cond-die    { flex: 0 0 68px;  width: 68px;  font-size: 11px; }
 .dtm-it-cond-label  { flex: 0.75 1 0; }
+
+/* Vertical separator between the write-mode group and the source group */
+.dtm-it-col-divider {
+  flex: 0 0 1px;
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 6px;
+  background: var(--color-border-light-tertiary, #444);
+  opacity: 0.55;
+}
 
 .dtm-it-col-value {
   flex: 1 1 0;
   min-width: 50px;
   font-size: 11px;
 }
+
+/* When the value column hosts the table-name span, shrink its share by ~30%. */
+.dtm-it-table-name.dtm-it-col-value { flex: 0.55 1 0; }
 
 /* ── Branch range inputs (inside conditional section bars) ── */
 .dtm-it-branch-num   { flex: 0 0 38px; width: 38px; font-size: 11px; text-align: center; }
@@ -2315,6 +2329,35 @@ input.dtm-col-range:disabled {
 .dtm-it-block-icon { flex-shrink: 0; font-size: 12px; opacity: 0.7; }
 .dtm-it-group-block > .dtm-it-block-header .dtm-it-block-icon { color: rgba(140, 200, 100, 0.9); }
 .dtm-it-cond-block > .dtm-it-block-header .dtm-it-block-icon  { color: rgba(120, 170, 255, 0.9); }
+
+/* Collapse / expand toggle on group + conditional headers */
+.dtm-it-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+}
+.dtm-it-collapse-toggle:hover {
+  background: rgba(255, 255, 255, 0.10);
+}
+.dtm-it-collapse-toggle:hover .dtm-it-block-icon { opacity: 1; }
+.dtm-it-collapse-chevron {
+  font-size: 11px;
+  opacity: 0.6;
+  transition: transform 0.15s;
+}
+.dtm-it-collapse-toggle:hover .dtm-it-collapse-chevron { opacity: 1; }
+.dtm-it-block.dtm-it-collapsed > .dtm-it-block-header .dtm-it-collapse-chevron {
+  transform: rotate(-90deg);
+}
+.dtm-it-block.dtm-it-collapsed > .dtm-it-group-body,
+.dtm-it-block.dtm-it-collapsed > .dtm-it-block-section {
+  display: none;
+}
 
 /* Group body: children drop zone */
 .dtm-it-group-body {
