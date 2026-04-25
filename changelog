@@ -3,6 +3,31 @@
 ## Major
 - Item Template implementation
 
+
+### Item Templates
+This is a large feature release that represents a major addition to table capabilities. Note that this tabletype exists outside of foundrys normal table capabilities. If the module is disabled or removed these tables appear as empty tables. The metadata is tied to the table and should remain however.
+
+Features:
+Create item templates To generate new items based on sub tables.
+
+- Base item: 
+Choose/roll a base item, or don't. If a base item is selected all attributes of the generated item default to the base items attributes, and can be overwritten/appended to with new rolls.
+
+- Conditionals:
+Set a die formula: d4, d6, d10, d100.
+Add a branch and select the range of results. The things within the conditional branch will only be triggered on a roll. Note that you do not have to create empty branches for null results.
+
+IE if something has a 2-in-6 chance of generating, you may do a d6 conditiona, and create a single branch for 1-2.
+
+- Groups:
+These are largely organizational, and help with duplicating large chunks of table logic that can be tweaked for different parts.
+
+- Add  Attributes
+Add attributes to groups/conditional branches. This is the bread and butter. The attributes in question belong to the item type selected by the generator.
+
+- - Join method: Append, Prepend, Overwrite, Add(INT).
+These methods determine what the results of the row will have on the base item. Append/prepend will add whatever results come up to either the front or back of the existing attribute values for the base item. Overwrite will completely replace the value, and add(int) will take an existing numerical value and add the result to it(this can be used for things like creating magic armor/magic weapon bonus' that increase AC/To-hit bonus rather then replace them.)
+
 # v1.3.2
 
 ## Minor
