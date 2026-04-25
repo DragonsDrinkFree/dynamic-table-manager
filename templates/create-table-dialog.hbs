@@ -17,7 +17,7 @@
         </select>
       </div>
 
-      {{#unless isJournalTemplate}}
+      {{#if showCreationMethod}}
       <div class="dtm-field-group" style="flex:1">
         <label for="dtm-new-method">Creation Method</label>
         <select id="dtm-new-method" name="creationMethod">
@@ -26,11 +26,11 @@
           {{/each}}
         </select>
       </div>
-      {{/unless}}
+      {{/if}}
     </div>
 
     {{!-- Paste Table UI --}}
-    {{#if isPaste}}{{#unless isJournalTemplate}}
+    {{#if isPaste}}{{#if showCreationMethod}}
     <div class="dtm-paste-section">
       <div class="dtm-field-group">
         <label for="dtm-paste-content">Paste Table Text</label>
@@ -115,7 +115,7 @@
       {{/if}}{{/if}}
 
     </div>
-    {{/unless}}{{/if}}
+    {{/if}}{{/if}}
 
     <div class="dtm-dialog-buttons">
       <button type="button" data-action="create" class="dtm-btn-primary">

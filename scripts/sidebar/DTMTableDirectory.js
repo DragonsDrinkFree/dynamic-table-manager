@@ -1,5 +1,6 @@
 import { TableEditorWindow } from "../apps/TableEditorWindow.js";
 import { JournalTemplateEditorWindow } from "../apps/JournalTemplateEditorWindow.js";
+import { ItemTemplateEditorWindow } from "../apps/ItemTemplateEditorWindow.js";
 import { CreateTableDialog } from "../apps/CreateTableDialog.js";
 
 const MODULE_ID = "dynamic-table-manager";
@@ -68,7 +69,10 @@ export class DTMTableDirectory extends RollTableDirectory {
       ev.stopImmediatePropagation();
       const table = game.tables.get(entry.dataset.entryId);
       if (!table) return;
-      if (table.getFlag("dynamic-table-manager", "tableType") === "journal-template") {
+      const tableType = table.getFlag("dynamic-table-manager", "tableType");
+      if (tableType === "item-template") {
+        ItemTemplateEditorWindow.openForTable(table);
+      } else if (tableType === "journal-template") {
         JournalTemplateEditorWindow.openForTable(table);
       } else {
         TableEditorWindow.openForTable(table);

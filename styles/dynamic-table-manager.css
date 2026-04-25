@@ -2184,3 +2184,370 @@ input.dtm-col-range:disabled {
   margin-top: 4px;
 }
 
+/* ===================================================================
+   Item Template Editor
+   =================================================================== */
+
+.dtm-it-window .window-content { padding: 0; overflow: hidden; }
+
+/* Single-column layout — same pattern as .dtm-editor-container */
+.dtm-it-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Config header ── */
+.dtm-it-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 12px;
+  padding: 8px 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #444);
+}
+
+.dtm-it-header-full { grid-column: 1 / -1; }
+
+.dtm-it-picker-row,
+.dtm-it-base-row { display: flex; align-items: center; gap: 4px; }
+
+.dtm-it-picker-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--color-text-light-secondary, #ccc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Toolbar ── */
+.dtm-it-toolbar { flex-shrink: 0; }
+
+.dtm-it-generate-btn { background: rgba(80, 180, 100, 0.15); border-color: rgba(80, 180, 100, 0.4); }
+.dtm-it-generate-btn:hover { background: rgba(80, 180, 100, 0.3); }
+
+/* ── Action tree scroll area ── */
+/* Block layout (not flex) so children overflow rather than shrink — same pattern as .dtm-row-list */
+.dtm-it-tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+/* ── Attribute row (column layout) ── */
+.dtm-it-action-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  margin-bottom: 2px;
+}
+
+.dtm-it-action-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--color-border-light-tertiary, #444);
+}
+
+/* ── Row column widths ── */
+.dtm-it-col-path {
+  flex: 0.76 1 0;       /* ~10% narrower than the previous 0.85 */
+  min-width: 60px;
+  font-family: var(--font-mono, "Courier New", monospace);
+  font-size: 11px;
+}
+
+.dtm-it-col-wmode   { flex: 0 0 68px;  width: 68px;  font-size: 11px; }
+.dtm-it-col-srctype { flex: 0 0 66px;  width: 66px;  font-size: 11px; }
+.dtm-it-col-append  { flex: 0 0 68px;  width: 68px;  font-size: 11px; }
+.dtm-it-col-sep     { flex: 0 0 52px;  width: 52px;  font-size: 11px; }
+.dtm-it-col-tfield  { flex: 0 0 100px; width: 100px; font-size: 11px; }
+.dtm-it-cond-die    { flex: 0 0 68px;  width: 68px;  font-size: 11px; }
+.dtm-it-cond-label  { flex: 0.75 1 0; }
+
+/* Vertical separator between the write-mode group and the source group */
+.dtm-it-col-divider {
+  flex: 0 0 1px;
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 6px;
+  background: var(--color-border-light-tertiary, #444);
+  opacity: 0.55;
+}
+
+.dtm-it-col-value {
+  flex: 1 1 0;
+  min-width: 50px;
+  font-size: 11px;
+}
+
+/* When the value column hosts the table-name span, shrink its share by ~30%. */
+.dtm-it-table-name.dtm-it-col-value { flex: 0.55 1 0; }
+
+/* ── Branch range inputs (inside conditional section bars) ── */
+.dtm-it-branch-num   { flex: 0 0 38px; width: 38px; font-size: 11px; text-align: center; }
+.dtm-it-branch-sep   { flex-shrink: 0; font-size: 11px; color: var(--color-text-light-tertiary, #888); }
+.dtm-it-branch-label { flex: 0 0 80px; width: 80px; font-size: 11px; }
+
+.dtm-it-col-label { flex: 1 1 0; min-width: 60px; font-size: 12px; }
+
+.dtm-it-table-name {
+  font-size: 11px;
+  color: var(--color-text-light-secondary, #ccc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-style: italic;
+}
+
+/* ── Block containers (Group / Conditional) ── */
+.dtm-it-block {
+  border: 1px solid var(--color-border-light-tertiary, #444);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+
+.dtm-it-group-block { border-left: 3px solid rgba(140, 200, 100, 0.5); }
+.dtm-it-cond-block  { border-left: 3px solid rgba(100, 160, 255, 0.5); }
+
+.dtm-it-block-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  min-height: 30px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.dtm-it-block-icon { flex-shrink: 0; font-size: 12px; opacity: 0.7; }
+.dtm-it-group-block > .dtm-it-block-header .dtm-it-block-icon { color: rgba(140, 200, 100, 0.9); }
+.dtm-it-cond-block > .dtm-it-block-header .dtm-it-block-icon  { color: rgba(120, 170, 255, 0.9); }
+
+/* Collapse / expand toggle on group + conditional headers */
+.dtm-it-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+}
+.dtm-it-collapse-toggle:hover {
+  background: rgba(255, 255, 255, 0.10);
+}
+.dtm-it-collapse-toggle:hover .dtm-it-block-icon { opacity: 1; }
+.dtm-it-collapse-chevron {
+  font-size: 11px;
+  opacity: 0.6;
+  transition: transform 0.15s;
+}
+.dtm-it-collapse-toggle:hover .dtm-it-collapse-chevron { opacity: 1; }
+.dtm-it-block.dtm-it-collapsed > .dtm-it-block-header .dtm-it-collapse-chevron {
+  transform: rotate(-90deg);
+}
+.dtm-it-block.dtm-it-collapsed > .dtm-it-group-body,
+.dtm-it-block.dtm-it-collapsed > .dtm-it-block-section {
+  display: none;
+}
+
+/* Group body: children drop zone */
+.dtm-it-group-body {
+  background: rgba(0, 0, 0, 0.07);
+  padding: 2px 0;
+  min-height: 32px;
+}
+
+/* Conditional section (THEN / ELSE) */
+.dtm-it-block-section { border-top: 1px solid rgba(0, 0, 0, 0.2); }
+
+.dtm-it-section-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.1);
+  min-height: 26px;
+}
+
+.dtm-it-section-label {
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--color-text-light-tertiary, #777);
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.dtm-it-section-body {
+  padding: 2px 0;
+  min-height: 30px;
+}
+
+/* ── Add buttons row (inside group / section) ── */
+.dtm-it-add-row { display: flex; align-items: center; gap: 4px; padding: 2px 6px; opacity: 0.55; }
+.dtm-it-add-row:hover { opacity: 1; }
+.dtm-it-add-row button { font-size: 11px; }
+
+/* ── Condition summary on header ── */
+.dtm-it-cond-summary {
+  font-size: 11px;
+  font-weight: bold;
+  color: rgba(140, 190, 255, 0.9);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Condition editor inline panel ── */
+.dtm-it-cond-editor {
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.dtm-it-cond-editor-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.dtm-it-cond-editor-inner label { display: flex; align-items: center; gap: 4px; }
+
+/* ── Drag-and-drop ── */
+.dtm-drag-handle {
+  flex-shrink: 0;
+  cursor: grab;
+  padding: 0 3px;
+  color: var(--color-text-light-tertiary, #666);
+  opacity: 0.4;
+  user-select: none;
+  font-size: 12px;
+}
+.dtm-drag-handle:hover { opacity: 0.9; }
+.dtm-drag-handle:active { cursor: grabbing; }
+
+.dtm-dragging { opacity: 0.35 !important; }
+
+.dtm-drop-line {
+  height: 2px;
+  background: rgba(100, 180, 255, 0.8);
+  border-radius: 1px;
+  pointer-events: none;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.dtm-drag-over {
+  outline: 2px solid rgba(100, 160, 255, 0.4);
+  outline-offset: -1px;
+  border-radius: 2px;
+}
+
+/* ── Small icon buttons in tree rows ── */
+.dtm-icon-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: var(--color-text-light-tertiary, #888);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.dtm-icon-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--color-text-light-primary, #eee); }
+.dtm-icon-btn.dtm-active { color: rgba(140, 200, 255, 0.9); background: rgba(100, 160, 240, 0.15); }
+.dtm-icon-btn.dtm-danger:hover { color: rgba(220, 80, 80, 1); background: rgba(200, 60, 60, 0.12); }
+
+/* ── Empty state ── */
+.dtm-it-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--color-text-light-tertiary, #777);
+  text-align: center;
+  gap: 4px;
+}
+
+.dtm-it-empty-state i { font-size: 32px; margin-bottom: 8px; opacity: 0.3; }
+.dtm-it-empty-state p { margin: 0; font-size: 12px; line-height: 1.5; }
+
+/* ── Attribute picker popup ── */
+.dtm-attr-picker {
+  position: fixed;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  max-height: 320px;
+  background: var(--color-bg-option, #1e1e2e);
+  border: 1px solid var(--color-border-light-tertiary, #555);
+  border-radius: 5px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.dtm-attr-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #444);
+  flex-shrink: 0;
+}
+
+.dtm-attr-picker-search i { opacity: 0.45; font-size: 11px; flex-shrink: 0; }
+
+.dtm-attr-picker-search input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--color-text-light-primary, #eee);
+  font-size: 12px;
+}
+
+.dtm-attr-picker-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 3px;
+}
+
+.dtm-attr-picker-item {
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-family: var(--font-mono, "Courier New", monospace);
+  font-size: 11px;
+  color: var(--color-text-light-secondary, #ccc);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dtm-attr-picker-item:hover {
+  background: rgba(100, 160, 255, 0.15);
+  color: var(--color-text-light-primary, #eee);
+}
+
+.dtm-attr-picker-empty {
+  padding: 10px 8px;
+  font-size: 11px;
+  color: var(--color-text-light-tertiary, #777);
+  font-style: italic;
+}
+
