@@ -20,7 +20,8 @@ const DEFAULT_CONFIG = () => ({
 const WRITE_MODES = [
   ["overwrite", "Overwrite"],
   ["append",    "Append"],
-  ["prepend",   "Prepend"]
+  ["prepend",   "Prepend"],
+  ["add",       "Add (INT)"]
 ];
 
 const APPEND_OPTIONS = [

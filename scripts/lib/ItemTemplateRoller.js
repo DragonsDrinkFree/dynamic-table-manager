@@ -101,6 +101,18 @@ export class ItemTemplateRoller {
           foundry.utils.setProperty(overrides, action.path,
             ItemTemplateRoller._prependValue(existing, value, action.appendMode, action.appendSeparator)
           );
+        } else if (action.writeMode === "add") {
+          const addend = parseInt(value, 10);
+          if (Number.isNaN(addend)) {
+            console.warn(`DTM ItemTemplate: "Add (INT)" mode requires a numeric value at "${action.path}"; got "${value}". Skipping.`);
+            continue;
+          }
+          const existingRaw = foundry.utils.getProperty(overrides, action.path)
+            ?? foundry.utils.getProperty(baseData, action.path)
+            ?? 0;
+          const existingNum = Number(existingRaw);
+          const safeBase = Number.isFinite(existingNum) ? existingNum : 0;
+          foundry.utils.setProperty(overrides, action.path, safeBase + addend);
         } else {
           foundry.utils.setProperty(overrides, action.path, value);
         }
