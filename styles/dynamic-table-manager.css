@@ -2262,10 +2262,12 @@ input.dtm-col-range:disabled {
   font-size: 11px;
 }
 
-.dtm-it-col-wmode  { flex: 0 0 68px; width: 68px; font-size: 11px; }
-.dtm-it-col-srctype { flex: 0 0 62px; width: 62px; font-size: 11px; }
-.dtm-it-col-append { flex: 0 0 68px; width: 68px; font-size: 11px; }
-.dtm-it-col-sep    { flex: 0 0 52px; width: 52px; font-size: 11px; }
+.dtm-it-col-wmode   { flex: 0 0 68px; width: 68px; font-size: 11px; }
+.dtm-it-col-srctype { flex: 0 0 66px; width: 66px; font-size: 11px; }
+.dtm-it-col-append  { flex: 0 0 68px; width: 68px; font-size: 11px; }
+.dtm-it-col-sep     { flex: 0 0 52px; width: 52px; font-size: 11px; }
+.dtm-it-cond-die    { flex: 0 0 68px; width: 68px; font-size: 11px; }
+.dtm-it-cond-label  { flex: 0.75 1 0; }
 
 .dtm-it-col-value {
   flex: 1 1 0;
