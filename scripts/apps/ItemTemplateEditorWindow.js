@@ -132,6 +132,10 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
   static openForTable(table) {
     let inst = this._instances.get(table.id);
     if (inst) { inst.bringToTop(); return inst; }
+    // Repair the underlying RollTable shape if needed (dummy result + replacement)
+    // so external triggers like sidebar "Draw Result" / drag-to-chat work. No-op
+    // for non-GMs and idempotent across calls.
+    ItemTemplateRoller.ensureDummyResult(table);
     inst = new this({ table });
     this._instances.set(table.id, inst);
     inst.render(true);

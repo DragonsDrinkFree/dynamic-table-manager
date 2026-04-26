@@ -4,6 +4,7 @@ import { ItemTemplateEditorWindow } from "./ItemTemplateEditorWindow.js";
 import { PDFScannerWindow } from "./PDFScannerWindow.js";
 import { PasteTableParser } from "../lib/PasteTableParser.js";
 import { TableCreator } from "../lib/TableCreator.js";
+import { ItemTemplateRoller } from "../lib/ItemTemplateRoller.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -165,9 +166,11 @@ export class CreateTableDialog extends HandlebarsApplicationMixin(ApplicationV2)
       const table = await RollTable.create({
         name,
         formula: "1",
+        replacement: true,
         folder: this.#folderId,
         flags: { "dynamic-table-manager": { tableType: "item-template" } }
       });
+      await ItemTemplateRoller.ensureDummyResult(table);
       ItemTemplateEditorWindow.openForTable(table);
       this.close();
       return;

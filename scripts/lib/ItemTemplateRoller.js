@@ -1,6 +1,60 @@
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "avif"]);
 
+const DUMMY_RESULT_NAME = "Dynamic Table: Item Template";
+const DUMMY_RESULT_TEXT =
+  "This result is a meta result for the Item Template table type within the " +
+  "Dynamic Table Manager Module. If you are seeing this, you may need to " +
+  "re-enable the Dynamic Table Manager.";
+
 export class ItemTemplateRoller {
+
+  /**
+   * Make sure an item-template table has the structure Foundry's RollTable
+   * machinery expects (a single inert TableResult covering the formula's range,
+   * and `replacement: true` so native draws never mark it as drawn). Item
+   * Template tables aren't really roll tables — the dummy result only exists
+   * to satisfy Foundry's "do you have any results?" pre-checks. Our
+   * `RollTable.prototype.draw` wrapper intercepts before the dummy is ever
+   * actually rolled.
+   *
+   * Idempotent: safe to call any number of times. Repairs damage (missing
+   * dummy, extra results, replacement turned off) by rebuilding to a known
+   * good state.
+   *
+   * @param {RollTable} table
+   * @returns {Promise<void>}
+   */
+  static async ensureDummyResult(table) {
+    if (!table) return;
+    if (!game.user?.isGM) return;  // only GMs can mutate world docs
+
+    const updates = {};
+    if (table.formula !== "1")    updates.formula = "1";
+    if (table.replacement !== true) updates.replacement = true;
+    if (Object.keys(updates).length) await table.update(updates);
+
+    const results = Array.from(table.results ?? []);
+    const hasOneCorrectDummy = results.length === 1
+      && results[0].text === DUMMY_RESULT_TEXT
+      && (results[0].range?.[0] ?? 0) === 1
+      && (results[0].range?.[1] ?? 0) === 1
+      && results[0].drawn === false;
+
+    if (hasOneCorrectDummy) return;
+
+    if (results.length) {
+      await table.deleteEmbeddedDocuments("TableResult", results.map(r => r.id));
+    }
+    await table.createEmbeddedDocuments("TableResult", [{
+      type: CONST.TABLE_RESULT_TYPES.TEXT,
+      name: DUMMY_RESULT_NAME,
+      text: DUMMY_RESULT_TEXT,
+      range: [1, 1],
+      weight: 1,
+      drawn: false
+    }]);
+  }
+
 
   /**
    * Generate a Foundry Item from an Item Template and place it in the
@@ -308,7 +362,7 @@ export class ItemTemplateRoller {
     const table = await fromUuid(tableUuid).catch(() => null);
     if (!(table instanceof RollTable)) return null;
 
-    const draw = await table.draw({ displayChat: false });
+    const draw = await table.draw({ displayChat: false, _dtmBypass: true });
     const result = draw.results?.[0];
     if (!result) return null;
 

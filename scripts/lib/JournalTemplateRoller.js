@@ -58,7 +58,7 @@ export class JournalTemplateRoller {
       }
 
       try {
-        const draw = await sourceTable.draw({ displayChat: false });
+        const draw = await sourceTable.draw({ displayChat: false, _dtmBypass: true });
         const result = draw.results?.[0];
         substitutions[key] = result ? (result.name || "") : "";
       } catch (err) {

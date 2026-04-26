@@ -3,8 +3,6 @@ import { JournalTemplateEditorWindow } from "../apps/JournalTemplateEditorWindow
 import { ItemTemplateEditorWindow } from "../apps/ItemTemplateEditorWindow.js";
 import { CreateTableDialog } from "../apps/CreateTableDialog.js";
 
-const MODULE_ID = "dynamic-table-manager";
-
 /**
  * Custom RollTable directory that replaces the default sidebar tab.
  * Extends the native RollTableDirectory to preserve folder support,
