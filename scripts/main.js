@@ -78,6 +78,40 @@ Hooks.once("ready", () => {
   console.log(`${MODULE_ID} | Dynamic Table Manager ready`);
 });
 
+// Wire reroll buttons on Item Template result cards. Listens on the chat
+// message render hook (v14: renderChatMessageHTML; older: renderChatMessage).
+function _bindResultCardClicks(root) {
+  if (!root) return;
+  const buttons = root.querySelectorAll('[data-dtm-action="reroll"]');
+  for (const btn of buttons) {
+    if (btn.dataset.dtmBound === "1") continue;
+    btn.dataset.dtmBound = "1";
+    btn.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const itemUuid = btn.dataset.itemUuid;
+      const actionId = btn.dataset.actionId;
+      const messageId = btn.closest("[data-message-id]")?.dataset.messageId
+                     ?? btn.closest(".message")?.dataset.messageId;
+      btn.disabled = true;
+      try {
+        await ItemTemplateRoller.rerollAction(itemUuid, actionId, messageId);
+      } catch (err) {
+        console.error(`${MODULE_ID} | Reroll failed`, err);
+        ui.notifications.error("Reroll failed. Check the console for details.");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+}
+
+Hooks.on("renderChatMessageHTML", (_msg, html) => _bindResultCardClicks(html));
+Hooks.on("renderChatMessage",     (_msg, html) => {
+  const root = html instanceof HTMLElement ? html : html?.[0];
+  _bindResultCardClicks(root);
+});
+
 // Add a DTM "New Table" button to every folder in the table directory.
 Hooks.on("renderRollTableDirectory", (_app, html) => {
   const root = html instanceof HTMLElement ? html : html[0];

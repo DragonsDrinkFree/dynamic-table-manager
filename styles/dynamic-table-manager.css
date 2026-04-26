@@ -2551,3 +2551,110 @@ input.dtm-col-range:disabled {
   font-style: italic;
 }
 
+/* ===== Item Template result card (chat) =====================================
+ * Theme-agnostic: uses `inherit` + `opacity` for body and muted text so the
+ * card reads correctly whether chat is rendered with a light or dark theme.
+ */
+
+.dtm-result-card {
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: inherit;
+}
+
+.dtm-rc-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.dtm-rc-header i.fa-hat-wizard { color: rgba(160, 100, 210, 1); }
+.dtm-rc-header-label { font-weight: bold; }
+
+.dtm-rc-source {
+  font-size: 11px;
+  opacity: 0.65;
+  margin-bottom: 6px;
+}
+
+.dtm-rc-section + .dtm-rc-section { margin-top: 8px; }
+
+.dtm-rc-section-name {
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(50, 110, 200, 1);    /* legible on both light and dark chat */
+  border-bottom: 1px solid rgba(127, 127, 127, 0.3);
+  padding: 1px 0 2px;
+  margin-bottom: 3px;
+}
+
+.dtm-rc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 3px;
+}
+.dtm-rc-row + .dtm-rc-row { margin-top: 2px; }
+.dtm-rc-row:hover { background: rgba(127, 127, 127, 0.12); }
+
+.dtm-rc-reroll {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  background: rgba(70, 160, 90, 0.85);
+  border: 1px solid rgba(70, 160, 90, 1);
+  border-radius: 3px;
+  color: white;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, transform 0.05s;
+}
+.dtm-rc-reroll:hover {
+  background: rgba(85, 185, 105, 1);
+  border-color: rgba(50, 130, 70, 1);
+}
+.dtm-rc-reroll:active {
+  transform: translateY(1px);
+}
+.dtm-rc-reroll:disabled {
+  opacity: 0.45;
+  cursor: progress;
+}
+
+.dtm-rc-row-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dtm-rc-row-path {
+  font-family: var(--font-mono, "Courier New", monospace);
+  font-size: 10px;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dtm-rc-row-value {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dtm-rc-empty {
+  padding: 6px 4px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
