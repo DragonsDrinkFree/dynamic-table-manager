@@ -303,11 +303,11 @@ export class ItemTemplateRoller {
    * @returns {Promise<string|null>}
    */
   static async _resolveAttributeValue(action) {
-    if (action.sourceType === "text") {
-      return action.value ?? null;
-    }
+    let value = null;
 
-    if (action.sourceType === "table") {
+    if (action.sourceType === "text") {
+      value = action.value ?? null;
+    } else if (action.sourceType === "table") {
       if (!action.tableUuid) return null;
       const result = await ItemTemplateRoller._rollTableRecursive(action.tableUuid);
       if (!result) return null;
@@ -325,12 +325,15 @@ export class ItemTemplateRoller {
         description = ItemTemplateRoller._getDescription(result.doc);
       }
 
-      if (tableField === "description") return description || name;     // fall back to name if no desc
-      if (tableField === "both")        return ItemTemplateRoller._joinNameAndDesc(name, description);
-      return name;
+      if (tableField === "description")     value = description || name;   // fall back to name if no desc
+      else if (tableField === "both")       value = ItemTemplateRoller._joinNameAndDesc(name, description);
+      else                                  value = name;
     }
 
-    return null;
+    // Final pass: evaluate any [[…]] inline-roll formulas before the value gets
+    // written to the item. Covers text sources, table-name sources, table
+    // descriptions, and the joined "Both" mode in one place.
+    return await ItemTemplateRoller._evaluateInlineRolls(value);
   }
 
   /**
@@ -372,6 +375,36 @@ export class ItemTemplateRoller {
    * - Otherwise emit a single `<br>` so plain-text descriptions still drop to a new line.
    * Result: roughly one visible line gap regardless of whether the source is plain or HTML.
    */
+  /**
+   * Evaluate Foundry's inline-roll syntax `[[formula]]` (with optional `/r` prefix)
+   * in a string, replacing each match with the roll's numeric total. Invalid
+   * formulas are left as literal text and a warning is logged so the GM can fix
+   * the template.
+   *
+   * @param {string|null} text
+   * @returns {Promise<string|null>}
+   */
+  static async _evaluateInlineRolls(text) {
+    if (typeof text !== "string" || !text.includes("[[")) return text;
+    const pattern = /\[\[\s*(?:\/r\s+)?([^\]]+?)\s*\]\]/g;
+    const matches = [...text.matchAll(pattern)];
+    if (!matches.length) return text;
+
+    let result = text;
+    for (const [whole, formula] of matches) {
+      try {
+        const roll = await new Roll(formula).evaluate();
+        result = result.replace(whole, String(roll.total));
+      } catch (err) {
+        console.warn(
+          `DTM ItemTemplate: invalid inline roll "${formula}" — leaving literal in place.`,
+          err
+        );
+      }
+    }
+    return result;
+  }
+
   static _joinNameAndDesc(name, description) {
     if (!description) return name;
     const trimmed = description.replace(/^\s+/, "");

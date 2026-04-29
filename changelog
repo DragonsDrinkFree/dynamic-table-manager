@@ -1,3 +1,23 @@
+# v1.4.3
+
+## Minor
+- Bug fix for anchored columns resetting numbering
+- Bug fix for anchored columns not having full range of anchored item.
+- Performance improvements
+- Fix for issue where invalid ranges spiraled into an infinite warning loop.
+- Other performance Tweaks.
+
+# v1.4.2
+
+## minor
+- patched in support for [[#d#]] dice rolls for assigning values to template items
+
+
+# v1.4.1
+
+## Minor
+- Improvements to Item Templates. Added ability to draw from outside of table generator. (performs like a standard table now)
+- Added ability to reroll rolled attributes in an item.
 # v1.4.0
 
 ## Major
