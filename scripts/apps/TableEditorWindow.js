@@ -613,20 +613,48 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const index = sorted.findIndex(r => r.id === resultId);
     if (index <= 0) return; // First row cannot be linked
 
-    const currentlyLinked = !!sorted[index].getFlag("dynamic-table-manager", "linked");
+    const result = sorted[index];
+    const currentlyLinked = !!result.getFlag("dynamic-table-manager", "linked");
     const newLinked = !currentlyLinked;
-
-    // Compute new ranges for all rows, accounting for the toggled link state
-    let currentRange = 0;
-    const updates = sorted.map((r, i) => {
-      const linked = i > 0 && (r.id === resultId ? newLinked : !!r.getFlag("dynamic-table-manager", "linked"));
-      if (!linked) currentRange++;
-      const update = { _id: r.id, range: [currentRange, currentRange], weight: 1 };
-      if (r.id === resultId) update.flags = { "dynamic-table-manager": { linked: newLinked } };
-      return update;
-    });
+    const prevRow = sorted[index - 1];
 
     const before = this._getTableState();
+    const updates = [];
+
+    if (newLinked) {
+      // Linking: row inherits the exact range of the row immediately above it
+      updates.push({
+        _id: resultId,
+        range: [prevRow.range[0], prevRow.range[1]],
+        weight: this._weightFromRange([prevRow.range[0], prevRow.range[1]]),
+        flags: { "dynamic-table-manager": { linked: true } }
+      });
+    } else {
+      // Unlinking: row gets its own slot immediately after the group anchor's high
+      const oldRange = result.range;
+      const newSlot = prevRow.range[1] + 1;
+      updates.push({
+        _id: resultId,
+        range: [newSlot, newSlot],
+        weight: 1,
+        flags: { "dynamic-table-manager": { linked: false } }
+      });
+      // Shift subsequent rows that conflict with the new slot, but skip other siblings
+      // that still share the old group range
+      for (const r of sorted.slice(index + 1)) {
+        const isSibling = r.range[0] === oldRange[0] && r.range[1] === oldRange[1]
+          && !!r.getFlag("dynamic-table-manager", "linked");
+        if (isSibling) continue;
+        if (r.range[0] <= newSlot) {
+          updates.push({
+            _id: r.id,
+            range: [r.range[0] + 1, r.range[1] + 1],
+            weight: this._weightFromRange([r.range[0] + 1, r.range[1] + 1])
+          });
+        }
+      }
+    }
+
     await this.table.updateEmbeddedDocuments("TableResult", updates);
     this._recordUndo("toggleLink", before);
     this.render();
@@ -639,19 +667,32 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const nonFirstLinked = sorted.slice(1).every(r => !!r.getFlag("dynamic-table-manager", "linked"));
     const newLinkedState = !nonFirstLinked;
 
-    let currentRange = 0;
-    const updates = sorted.map((r, i) => {
-      const linked = i > 0 && newLinkedState;
-      if (!linked) currentRange++;
-      return {
-        _id: r.id,
-        range: [currentRange, currentRange],
-        weight: 1,
-        flags: { "dynamic-table-manager": { linked } }
-      };
-    });
-
     const before = this._getTableState();
+    let updates;
+
+    if (newLinkedState) {
+      // Linking all: every row inherits the anchor's range — anchor keeps its range unchanged
+      const anchorRange = sorted[0].range;
+      updates = sorted.map((r, i) => ({
+        _id: r.id,
+        range: [anchorRange[0], anchorRange[1]],
+        weight: this._weightFromRange(anchorRange),
+        flags: { "dynamic-table-manager": { linked: i > 0 } }
+      }));
+    } else {
+      // Unlinking all: each row gets its own sequential slot
+      let currentRange = 0;
+      updates = sorted.map(r => {
+        currentRange++;
+        return {
+          _id: r.id,
+          range: [currentRange, currentRange],
+          weight: 1,
+          flags: { "dynamic-table-manager": { linked: false } }
+        };
+      });
+    }
+
     await this.table.updateEmbeddedDocuments("TableResult", updates);
     this._recordUndo("linkAll", before);
     this.render();
@@ -687,11 +728,15 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       select.value = select.dataset.currentType;
     });
 
-    // Use a single delegated change listener on the container.
-    // This is attached once and never accumulates across re-renders because
-    // _onRender replaces the inner HTML, giving us a fresh DOM each time.
-    html.addEventListener("change", (ev) => this._onFieldChange(ev));
-    html.addEventListener("keydown", (ev) => this._onKeyDown(ev));
+    // this.element is the persistent outer window shell in ApplicationV2 — it is NOT
+    // replaced between renders. Abort the previous set of delegated listeners before
+    // attaching new ones so they never accumulate across re-renders.
+    this._listenerAbort?.abort();
+    this._listenerAbort = new AbortController();
+    const { signal } = this._listenerAbort;
+
+    html.addEventListener("change", (ev) => this._onFieldChange(ev), { signal });
+    html.addEventListener("keydown", (ev) => this._onKeyDown(ev), { signal });
 
     // Prevent Enter on single-line inputs from triggering any form submit
     html.addEventListener("keydown", (ev) => {
@@ -700,7 +745,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
         ev.stopPropagation();
         ev.target.blur(); // commit the value via the change event
       }
-    });
+    }, { signal });
 
     // Document picker: clicking the drop-target on Document-type rows
     html.querySelectorAll(".dtm-drop-target").forEach(dropTarget => {
@@ -958,15 +1003,21 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     // ── Range column ──────────────────────────────────────────────────────────
     if (target.matches("input.dtm-col-range")) {
       const idx = rows.indexOf(currentRow);
-      for (let i = idx + step; i >= 0 && i < rows.length; i += step) {
-        const next = rows[i].querySelector("input.dtm-col-range");
-        if (next && !next.disabled) {
-          ev.preventDefault();
-          next.focus();
-          next.select();
-          return;
-        }
-      }
+      // Collect all enabled range inputs in visual order
+      const rangeInputs = rows
+        .map(r => r.querySelector("input.dtm-col-range"))
+        .filter(el => el && !el.disabled);
+      if (rangeInputs.length === 0) return;
+
+      const cur = rangeInputs.findIndex(el => el === target);
+      let nextIdx = cur + step;
+      // Wrap around at the boundaries so focus never escapes the window
+      if (nextIdx < 0) nextIdx = rangeInputs.length - 1;
+      else if (nextIdx >= rangeInputs.length) nextIdx = 0;
+
+      ev.preventDefault();
+      rangeInputs[nextIdx].focus();
+      rangeInputs[nextIdx].select();
       return;
     }
 
@@ -988,9 +1039,10 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     if (cur === -1) return;
 
     const next = focusables[cur + step];
+    // At the boundary: trap focus rather than letting it escape the window
+    ev.preventDefault();
     if (!next) return;
 
-    ev.preventDefault();
     next.focus();
     if (next.tagName === "INPUT") next.select();
   }
@@ -1007,50 +1059,63 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
   /**
    * Update a row's range with smart merge logic.
+   * Linked siblings (rows that share the same range as the target) automatically
+   * inherit the new range rather than being treated as conflicts.
+   * All updates are batched into a single updateEmbeddedDocuments call.
    * @param {string} resultId
    * @param {number[]} newRange [low, high]
    */
   async _updateRowRange(resultId, newRange) {
     const [newLow, newHigh] = newRange;
+    const targetResult = this.table.results.get(resultId);
+    const oldRange = targetResult?.range ?? [newLow, newHigh];
 
-    // Shift = how much the high boundary actually moved, not the total size of the range.
-    // e.g. [1,1] → [1,5]: shift = 5-1 = 4, so the next row at 2 lands at 6, not 7.
-    const oldHigh = this.table.results.get(resultId)?.range[1] ?? newLow - 1;
-    const shift = newHigh - oldHigh;
+    // Shift = how much the high boundary moved.
+    // e.g. [1,1] → [1,5]: shift = 4, so the next row at 2 lands at 6, not 7.
+    const shift = newHigh - oldRange[1];
 
-    // Find rows that conflict with the new range (excluding the row being edited)
-    const conflicting = this.table.results.filter(r => {
-      if (r.id === resultId) return false;
+    // Siblings share the exact same range as the edited row.
+    // They inherit the new range; they are never conflicts.
+    const siblingIds = new Set(
+      this.table.results.filter(r =>
+        r.id !== resultId && r.range[0] === oldRange[0] && r.range[1] === oldRange[1]
+      ).map(r => r.id)
+    );
+
+    // Only truly independent rows that overlap the new range count as conflicts.
+    const hasConflict = this.table.results.some(r => {
+      if (r.id === resultId || siblingIds.has(r.id)) return false;
       return r.range[0] <= newHigh && r.range[1] >= newLow;
     });
 
     const before = this._getTableState();
+    const allUpdates = [];
 
-    // Shift conflicting rows and all subsequent rows up to make room.
-    // Only shift when the range actually grew — shrinking never creates new conflicts.
-    if (conflicting.length > 0 && shift > 0) {
-      const toShift = this.table.results.filter(r => {
-        if (r.id === resultId) return false;
-        return r.range[0] >= newLow;
-      });
-      if (toShift.length > 0) {
-        await this.table.updateEmbeddedDocuments("TableResult",
-          toShift.map(r => ({
+    // Shift conflicting rows and everything after them to make room.
+    // Only needed when the range grew (shift > 0).
+    if (hasConflict && shift > 0) {
+      this.table.results.forEach(r => {
+        if (r.id === resultId || siblingIds.has(r.id)) return;
+        if (r.range[0] >= newLow) {
+          allUpdates.push({
             _id: r.id,
             range: [r.range[0] + shift, r.range[1] + shift],
             weight: this._weightFromRange([r.range[0] + shift, r.range[1] + shift])
-          }))
-        );
-      }
+          });
+        }
+      });
     }
 
-    // Update the target row's range
-    await this.table.updateEmbeddedDocuments("TableResult", [{
-      _id: resultId,
-      range: [newLow, newHigh],
-      weight: this._weightFromRange([newLow, newHigh])
-    }]);
+    // Update the edited row and all its siblings to the new range.
+    for (const id of [resultId, ...siblingIds]) {
+      allUpdates.push({
+        _id: id,
+        range: [newLow, newHigh],
+        weight: this._weightFromRange([newLow, newHigh])
+      });
+    }
 
+    await this.table.updateEmbeddedDocuments("TableResult", allUpdates);
     this._recordUndo("editRange", before);
     this.render();
   }
@@ -1127,18 +1192,29 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     const effectiveInsert = insertIndex > draggedIdx ? insertIndex - 1 : insertIndex;
     if (effectiveInsert === draggedIdx) return;
 
-    // Build new order
+    // Build the new visual order
     const reordered = [...sorted];
     const [dragged] = reordered.splice(draggedIdx, 1);
     reordered.splice(effectiveInsert, 0, dragged);
 
-    // Reassign ranges: give each row the range slot that was at its new position
-    const oldRanges = sorted.map(r => r.range);
-    const updates = reordered.map((r, i) => ({
-      _id: r.id,
-      range: oldRanges[i],
-      weight: this._weightFromRange(oldRanges[i])
-    }));
+    // The dragged row adopts the range of the row immediately above its landing position
+    // (or below it when landing at position 0).  Every other row keeps its own range,
+    // so dragging never cascades a range-shuffle through the whole table.
+    // order flags are updated for the full new sequence so same-range groups sort correctly.
+    const neighborRange = effectiveInsert > 0
+      ? reordered[effectiveInsert - 1].range
+      : reordered[1]?.range ?? dragged.range;
+
+    const rangeChanged = dragged.range[0] !== neighborRange[0] || dragged.range[1] !== neighborRange[1];
+
+    const updates = reordered.map((r, i) => {
+      const u = { _id: r.id, flags: { "dynamic-table-manager": { order: i } } };
+      if (r.id === draggedId && rangeChanged) {
+        u.range  = [neighborRange[0], neighborRange[1]];
+        u.weight = this._weightFromRange(neighborRange);
+      }
+      return u;
+    });
 
     const before = this._getTableState();
     this._restoreScrollTop = this.element?.querySelector(".dtm-row-list")?.scrollTop;
@@ -1316,6 +1392,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
   /** @override */
   async close(options = {}) {
+    this._listenerAbort?.abort();
     Hooks.off("updateTableResult", this._drawnHookId);
     TableEditorWindow._instances.delete(this.table.id);
     return super.close(options);

@@ -1,3 +1,12 @@
+# v1.4.3
+
+## Minor
+- Bug fix for anchored columns resetting numbering
+- Bug fix for anchored columns not having full range of anchored item.
+- Performance improvements
+- Fix for issue where invalid ranges spiraled into an infinite warning loop.
+- Other performance Tweaks.
+
 # v1.4.2
 
 ## minor
