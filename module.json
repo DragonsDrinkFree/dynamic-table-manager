@@ -1,7 +1,7 @@
 {
   "id": "dynamic-table-manager",
   "title": "Dynamic Table Manager",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "compatibility": {
     "minimum": "13",
     "verified": "14.360"
