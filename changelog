@@ -1,3 +1,11 @@
+# v1.4.4
+
+## Minor
+- Resolved v13 depreciation warnings.
+- Resolved a class extension hook error
+- Resolved conflicts with other modules that attempt to create a button in the same space as the DTM.
+
+
 # v1.4.3
 
 ## Minor

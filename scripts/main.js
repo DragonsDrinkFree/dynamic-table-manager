@@ -1,4 +1,4 @@
-import { DTMTableDirectory } from "./sidebar/DTMTableDirectory.js";
+import { registerTableDirectoryHooks } from "./sidebar/DTMTableDirectory.js";
 import { TableEditorWindow } from "./apps/TableEditorWindow.js";
 import { CreateTableDialog } from "./apps/CreateTableDialog.js";
 import { ItemTemplateRoller } from "./lib/ItemTemplateRoller.js";
@@ -9,8 +9,9 @@ const MODULE_ID = "dynamic-table-manager";
 Hooks.once("init", () => {
   console.log(`${MODULE_ID} | Initializing Dynamic Table Manager`);
 
-  // Replace the default RollTable directory with our custom one
-  CONFIG.ui.tables = DTMTableDirectory;
+  // Augment the RollTable directory via hooks (no CONFIG.ui.tables override),
+  // so we coexist with systems/modules that supply their own directory class.
+  registerTableDirectoryHooks();
 
   // Handlebars helpers
   Handlebars.registerHelper("subtract", (a, b) => Number(a) - Number(b));
@@ -18,15 +19,49 @@ Hooks.once("init", () => {
 
 Hooks.once("setup", () => {
   // Replace the native RollTable sheet with a stub that opens our editor.
-  // Done in "setup" (after "init") so CONFIG.RollTable.sheetClass is guaranteed to be set.
-  const NativeSheet = CONFIG.RollTable.sheetClass;
+  // The legacy CONFIG.RollTable.sheetClass slot is unset on v14 systems that
+  // register sheets exclusively through DocumentSheetConfig (e.g. ARS), so we
+  // resolve a base class defensively and register through both APIs.
+  const NativeSheet =
+    CONFIG.RollTable.sheetClass
+    ?? foundry.applications?.sheets?.RollTableSheet
+    ?? foundry.applications?.sheets?.RollTableConfig;
+
+  if (!NativeSheet) {
+    console.warn(`${MODULE_ID} | No RollTable sheet base class found; sheet interception disabled. Sidebar clicks will still open the editor.`);
+    return;
+  }
+
+  // The override short-circuits to our editor, so the base class's own logic
+  // never runs — extending it only satisfies instanceof checks and Foundry's
+  // sheet-instantiation contract.
   class DTMSheetInterceptor extends NativeSheet {
     render(...args) {
       TableEditorWindow.openForTable(this.document ?? this.object);
       return this;
     }
   }
+
+  // Legacy slot: still consulted by some flows on systems that populate it.
   CONFIG.RollTable.sheetClass = DTMSheetInterceptor;
+
+  // v14 registry: this is what wins under systems (like ARS) that use
+  // DocumentSheetConfig.registerSheet exclusively. Mirrors the API the
+  // system itself uses — no system-specific branching.
+  const registerSheet = foundry.applications?.apps?.DocumentSheetConfig?.registerSheet;
+  if (typeof registerSheet === "function") {
+    try {
+      registerSheet.call(
+        foundry.applications.apps.DocumentSheetConfig,
+        RollTable,
+        MODULE_ID,
+        DTMSheetInterceptor,
+        { makeDefault: true, label: "Dynamic Table Manager" }
+      );
+    } catch (err) {
+      console.warn(`${MODULE_ID} | DocumentSheetConfig.registerSheet failed; falling back to legacy sheetClass only.`, err);
+    }
+  }
 });
 
 Hooks.once("ready", () => {
@@ -78,8 +113,7 @@ Hooks.once("ready", () => {
   console.log(`${MODULE_ID} | Dynamic Table Manager ready`);
 });
 
-// Wire reroll buttons on Item Template result cards. Listens on the chat
-// message render hook (v14: renderChatMessageHTML; older: renderChatMessage).
+// Wire reroll buttons on Item Template result cards.
 function _bindResultCardClicks(root) {
   if (!root) return;
   const buttons = root.querySelectorAll('[data-dtm-action="reroll"]');
@@ -107,10 +141,6 @@ function _bindResultCardClicks(root) {
 }
 
 Hooks.on("renderChatMessageHTML", (_msg, html) => _bindResultCardClicks(html));
-Hooks.on("renderChatMessage",     (_msg, html) => {
-  const root = html instanceof HTMLElement ? html : html?.[0];
-  _bindResultCardClicks(root);
-});
 
 // Add a DTM "New Table" button to every folder in the table directory.
 Hooks.on("renderRollTableDirectory", (_app, html) => {
