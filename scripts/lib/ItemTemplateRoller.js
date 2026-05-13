@@ -35,7 +35,7 @@ export class ItemTemplateRoller {
 
     const results = Array.from(table.results ?? []);
     const hasOneCorrectDummy = results.length === 1
-      && results[0].text === DUMMY_RESULT_TEXT
+      && results[0].name === DUMMY_RESULT_NAME
       && (results[0].range?.[0] ?? 0) === 1
       && (results[0].range?.[1] ?? 0) === 1
       && results[0].drawn === false;
@@ -48,7 +48,7 @@ export class ItemTemplateRoller {
     await table.createEmbeddedDocuments("TableResult", [{
       type: CONST.TABLE_RESULT_TYPES.TEXT,
       name: DUMMY_RESULT_NAME,
-      text: DUMMY_RESULT_TEXT,
+      description: DUMMY_RESULT_TEXT,
       range: [1, 1],
       weight: 1,
       drawn: false
