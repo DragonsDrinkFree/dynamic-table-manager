@@ -2,6 +2,7 @@ import { TableEditorWindow } from "../apps/TableEditorWindow.js";
 import { JournalTemplateEditorWindow } from "../apps/JournalTemplateEditorWindow.js";
 import { ItemTemplateEditorWindow } from "../apps/ItemTemplateEditorWindow.js";
 import { CreateTableDialog } from "../apps/CreateTableDialog.js";
+import { AdvancedTableEditorWindow } from "../apps/AdvancedTableEditorWindow.js";
 
 /**
  * Sidebar table directory augmentation.
@@ -110,6 +111,8 @@ function _bindTableClicks(root) {
       ItemTemplateEditorWindow.openForTable(table);
     } else if (tableType === "journal-template") {
       JournalTemplateEditorWindow.openForTable(table);
+    } else if (tableType === "advanced-table") {
+      AdvancedTableEditorWindow.openForTable(table);
     } else {
       TableEditorWindow.openForTable(table);
     }

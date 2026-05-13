@@ -1,3 +1,7 @@
+# v1.5.0
+
+## Major
+- Advanced Table added: This table essentially lets you create logic for fiddly "25% chance of this, 15% chance of that" tables with complex branching logic.
 # v1.4.5
 
 ## Minor

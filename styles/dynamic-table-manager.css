@@ -2566,6 +2566,86 @@ input.dtm-col-range:disabled {
   color: inherit;
 }
 
+/* ===== Advanced Table: editor =============================================== */
+
+.dtm-at-col-label {
+  flex: 0 0 100px;
+  width: 100px;
+  font-size: 11px;
+}
+
+.dtm-at-doc-name {
+  font-style: italic;
+  color: var(--color-text-light-secondary, #ccc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dtm-at-doc-drop-zone {
+  border: 1px dashed transparent;
+  border-radius: 2px;
+  padding: 1px 4px;
+}
+
+.dtm-at-doc-drop-zone:hover,
+.dtm-at-doc-drop-zone.dtm-drop-active {
+  border-color: rgba(100, 160, 255, 0.5);
+  background: rgba(100, 160, 255, 0.06);
+}
+
+/* ===== Advanced Table: chat card =========================================== */
+
+.dtm-advanced-card {
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: inherit;
+}
+
+.dtm-ac-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(127, 127, 127, 0.3);
+}
+
+.dtm-ac-header i { color: rgba(100, 160, 255, 0.9); }
+
+.dtm-ac-results { display: flex; flex-direction: column; gap: 3px; }
+
+.dtm-ac-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.dtm-ac-row:hover { background: rgba(127, 127, 127, 0.10); }
+
+.dtm-ac-label {
+  flex: 0 0 auto;
+  font-weight: bold;
+  font-size: 11px;
+  color: var(--color-text-light-tertiary, #999);
+  white-space: nowrap;
+}
+
+.dtm-ac-value { flex: 1; min-width: 0; font-size: 12px; }
+
+.dtm-ac-empty {
+  padding: 6px 4px;
+  font-size: 11px;
+  opacity: 0.65;
+  font-style: italic;
+}
+
 .dtm-rc-header {
   display: flex;
   align-items: center;

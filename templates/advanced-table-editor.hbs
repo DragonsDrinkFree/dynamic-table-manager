@@ -1,0 +1,53 @@
+{{!-- Advanced Table Editor --}}
+<div class="dtm-it-container">
+
+  {{!-- Config Header --}}
+  <div class="dtm-it-header">
+    <div class="dtm-field-group">
+      <label>Table Name</label>
+      <input type="text" data-field="tableName" value="{{tableName}}" />
+    </div>
+  </div>{{!-- /.dtm-it-header --}}
+
+  {{!-- Toolbar --}}
+  <div class="dtm-toolbar dtm-it-toolbar">
+    <div class="dtm-toolbar-left">
+      <button type="button" data-action="addOutputHere"
+              data-parent-id="" data-parent-section="">
+        <i class="fas fa-plus"></i> Add Output
+      </button>
+      <button type="button" data-action="addConditional"
+              data-parent-id="" data-parent-section="">
+        <i class="fas fa-code-branch"></i> Add Conditional
+      </button>
+      <button type="button" data-action="addGroup"
+              data-parent-id="" data-parent-section="">
+        <i class="fas fa-layer-group"></i> Add Group
+      </button>
+      <button type="button" data-action="roll" class="dtm-it-generate-btn">
+        <i class="fas fa-dice"></i> Roll
+      </button>
+    </div>
+    <div class="dtm-toolbar-right">
+      <button type="button" data-action="undo" title="Undo (Ctrl+Z)" {{#unless canUndo}}disabled{{/unless}}>
+        <i class="fas fa-undo"></i>
+      </button>
+      <button type="button" data-action="redo" title="Redo (Ctrl+Y)" {{#unless canRedo}}disabled{{/unless}}>
+        <i class="fas fa-redo"></i>
+      </button>
+    </div>
+  </div>
+
+  {{!-- Action Tree --}}
+  <div class="dtm-it-tree" data-parent-id="" data-parent-section="">
+    {{{actionTreeHtml}}}
+    {{#unless actionTreeHtml}}
+    <div class="dtm-it-empty-state">
+      <i class="fas fa-table"></i>
+      <p>No outputs defined yet.</p>
+      <p>Use <strong>Add Output</strong> in the toolbar, or add outputs inside a Conditional or Group.</p>
+    </div>
+    {{/unless}}
+  </div>
+
+</div>{{!-- /.dtm-it-container --}}
