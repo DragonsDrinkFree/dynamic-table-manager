@@ -3,6 +3,7 @@
 ## Major
 - Drag and Drop documents for Advanced tables
 - Conditionals and Groups can now have an iteration could, which will allow the same result to be looped N number of times with a single entry.
+- Item Template/advanced tables/journal templates can have results drawn from advanced tables.
 ## Minor
 
 # v1.5.0
