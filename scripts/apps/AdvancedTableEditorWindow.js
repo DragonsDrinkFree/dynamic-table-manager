@@ -490,10 +490,11 @@ ${branchSections.join("\n")}
       toggleBtn.before(btn);
     }
 
-    html.addEventListener("change",  ev => this._onFieldChange(ev),   { signal });
-    html.addEventListener("keydown", ev => this._onKeyDown(ev),       { signal });
-    html.addEventListener("dragover", ev => this._onExternalDragOver(ev), { signal });
-    html.addEventListener("drop",     ev => this._onExternalDrop(ev),     { signal });
+    html.addEventListener("change",    ev => this._onFieldChange(ev),      { signal });
+    html.addEventListener("keydown",   ev => this._onKeyDown(ev),          { signal });
+    html.addEventListener("dragover",  ev => this._onExternalDragOver(ev), { signal });
+    html.addEventListener("dragleave", ev => this._onExternalDragLeave(ev),{ signal });
+    html.addEventListener("drop",      ev => this._onExternalDrop(ev),     { signal });
 
     const tree = html.querySelector(".dtm-it-tree");
     if (tree) this._setupDragDrop(tree);
@@ -523,33 +524,72 @@ ${branchSections.join("\n")}
 
   _onExternalDragOver(ev) {
     if (this._drag) return; // internal tree drag — handled by tree dragover
-    const zone = ev.target.closest(".dtm-at-doc-drop-zone");
-    if (zone) {
+    const docZone = ev.target.closest(".dtm-at-doc-drop-zone");
+    if (docZone) {
       ev.preventDefault();
       ev.dataTransfer.dropEffect = "link";
-      zone.classList.add("dtm-drop-active");
+      docZone.classList.add("dtm-drop-active");
       return;
     }
-    // Accept drops anywhere on the tree — will create a new output action.
-    if (ev.target.closest(".dtm-it-tree")) {
-      ev.preventDefault();
-      ev.dataTransfer.dropEffect = "link";
+    const tree = this.element?.querySelector(".dtm-it-tree");
+    if (!tree || !ev.target.closest(".dtm-it-tree")) return;
+
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = "link";
+
+    // Compute drop zone + insertion index, render a drop line, same as internal drag.
+    this._clearDragVisuals(tree);
+    tree.classList.add("dtm-doc-drop-target");
+
+    const dropZone = this._findDropZone(ev, tree);
+    const idx = this._getInsertIndex(dropZone, ev, null);
+    const children = [...dropZone.querySelectorAll(":scope > .dtm-it-action-row, :scope > .dtm-it-block")];
+
+    dropZone.classList.add("dtm-drag-over");
+
+    const line = document.createElement("div");
+    line.className = "dtm-drop-line";
+    if (idx < children.length) children[idx].before(line);
+    else {
+      const addRow = dropZone.querySelector(":scope > .dtm-it-add-row");
+      if (addRow) addRow.before(line);
+      else dropZone.appendChild(line);
+    }
+
+    this._externalDropTarget = { zone: dropZone, index: idx };
+  }
+
+  _onExternalDragLeave(ev) {
+    if (this._drag) return;
+    const tree = this.element?.querySelector(".dtm-it-tree");
+    if (tree && !tree.contains(ev.relatedTarget)) {
+      this._clearDragVisuals(tree);
+      tree.classList.remove("dtm-doc-drop-target");
+      this._externalDropTarget = null;
     }
   }
 
   async _onExternalDrop(ev) {
     if (this._drag) return; // internal tree drag handles its own drop
-    const zone = ev.target.closest(".dtm-at-doc-drop-zone");
-    if (zone) {
+    const tree = this.element?.querySelector(".dtm-it-tree");
+    if (tree) {
+      this._clearDragVisuals(tree);
+      tree.classList.remove("dtm-doc-drop-target");
+    }
+
+    const docZone = ev.target.closest(".dtm-at-doc-drop-zone");
+    if (docZone) {
       ev.preventDefault();
-      zone.classList.remove("dtm-drop-active");
-      await this._handleDocumentDrop(ev, zone.dataset.actionId);
+      docZone.classList.remove("dtm-drop-active");
+      this._externalDropTarget = null;
+      await this._handleDocumentDrop(ev, docZone.dataset.actionId);
       return;
     }
-    // Drop onto tree area (not an existing doc-zone) → create a new output action.
     if (ev.target.closest(".dtm-it-tree")) {
       ev.preventDefault();
-      await this._createDocumentOutput(ev);
+      const target = this._externalDropTarget;
+      this._externalDropTarget = null;
+      await this._createDocumentOutput(ev, target, tree);
     }
   }
 
@@ -569,26 +609,37 @@ ${branchSections.join("\n")}
     }, { render: "row", rowId: actionId });
   }
 
-  async _createDocumentOutput(ev) {
+  async _createDocumentOutput(ev, dropTarget, tree) {
     let data;
     try { data = TextEditor.getDragEventData(ev); } catch (_) { return; }
     if (!data?.uuid) return;
     const doc = await fromUuid(data.uuid).catch(() => null);
     if (!doc) return;
     const name = doc.name ?? data.uuid;
+
+    const { zone, index } = dropTarget ?? { zone: tree, index: Infinity };
+    const targetParentId      = (!zone || zone === tree) ? null : (zone.dataset.parentId      || null);
+    const targetParentSection = (!zone || zone === tree) ? null : (zone.dataset.parentSection || null);
+
+    const newAction = {
+      id: foundry.utils.randomID(),
+      type: "output",
+      label: name,
+      sourceType: "document",
+      value: "",
+      tableUuid: null,
+      tableName: null,
+      tableField: "name",
+      documentUuid: data.uuid,
+      documentName: name
+    };
+
     await this._editConfig(cfg => {
-      cfg.actions.push({
-        id: foundry.utils.randomID(),
-        type: "output",
-        label: name,
-        sourceType: "document",
-        value: "",
-        tableUuid: null,
-        tableName: null,
-        tableField: "name",
-        documentUuid: data.uuid,
-        documentName: name
-      });
+      const arr = targetParentId
+        ? (this._resolveTargetArray(cfg.actions, targetParentId, targetParentSection) ?? cfg.actions)
+        : cfg.actions;
+      const idx = Math.min(Math.max(0, isFinite(index) ? index : arr.length), arr.length);
+      arr.splice(idx, 0, newAction);
     });
   }
 

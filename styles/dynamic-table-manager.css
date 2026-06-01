@@ -2646,6 +2646,12 @@ input.dtm-col-range:disabled {
   font-style: italic;
 }
 
+.dtm-it-tree.dtm-doc-drop-target {
+  outline: 2px dashed rgba(100, 160, 255, 0.55);
+  outline-offset: -3px;
+  background: rgba(100, 160, 255, 0.04);
+}
+
 .dtm-at-loop-label {
   font-size: 11px;
   opacity: 0.6;
