@@ -19,6 +19,12 @@
               title="Draw a region around a true multi-column data table (range + multiple data columns).">
         <i class="fas fa-table-cells"></i> Multi Col
       </button>
+      <button type="button" data-action="selectTextScan"
+              class="dtm-btn-secondary{{#if isSelectTextScan}} dtm-active{{/if}}"
+              {{#unless hasPdf}}disabled{{/unless}}
+              title="Draw regions over formatted prose blocks (e.g. Name: Description… lists). Regions are added to the active group; apply rules to finalise it and start a new group.">
+        <i class="fas fa-align-left"></i> Text Scan
+      </button>
       <button type="button" data-action="importRecipe" class="dtm-btn-secondary"
               {{#unless hasPdf}}disabled{{/unless}}
               title="Load a recipe JSON and re-scan its regions on this PDF">
@@ -51,7 +57,7 @@
       <div class="dtm-pdf-empty">
         <i class="fas fa-file-pdf"></i>
         <p>Click <strong>Select PDF</strong> to open a file.</p>
-        <p class="dtm-pdf-empty-hint">Pick <strong>Single Col</strong> or <strong>Multi Col</strong>, then draw regions over table content.</p>
+        <p class="dtm-pdf-empty-hint">Pick <strong>Single Col</strong>, <strong>Multi Col</strong>, or <strong>Text Scan</strong>, then draw regions over table content.</p>
       </div>
       {{/unless}}
       <canvas id="dtm-pdf-canvas"></canvas>
@@ -70,17 +76,19 @@
     <div class="dtm-group-toolbar">
       <button type="button" data-action="addPrefixGroup" class="dtm-btn-secondary"
               {{#unless hasPdf}}disabled{{/unless}}
-              title="Create a new prefix group (e.g. Elf, Fighter) and its first instance. Regions drawn while this instance is active will share a role template with its sibling instances.">
+              title="Create a new prefix group (e.g. Elf, Fighter) and its first instance.">
         <i class="fas fa-plus"></i> Prefix Group
       </button>
       <button type="button" data-action="newGroupInstance" class="dtm-btn-secondary"
               {{#unless hasFamilies}}disabled{{/unless}}
-              title="Add another instance that shares the active family's role template (e.g. add Dwarf alongside Elf).">
+              title="Add another instance that shares the active family's role template.">
         <i class="fas fa-layer-group"></i> New Instance
       </button>
     </div>
 
     <div class="dtm-region-list">
+
+      {{!-- Prefix-grouped instances --}}
       {{#each instances}}
       <div class="dtm-instance-block">
         <div class="dtm-instance-header{{#if this.isActive}} dtm-instance-active{{/if}}"
@@ -107,7 +115,7 @@
           <div class="dtm-region-item{{#if this.isActive}} dtm-region-active{{/if}}"
                data-region-id="{{this.id}}">
             <input type="text" class="dtm-region-name" value="{{this.name}}" placeholder="Role name">
-            {{#if this.isOverride}}<span class="dtm-badge dtm-override-badge" title="Per-region name override (differs from shared role)">~</span>{{/if}}
+            {{#if this.isOverride}}<span class="dtm-badge dtm-override-badge" title="Per-region name override">~</span>{{/if}}
             <span class="dtm-badge dtm-mode-badge dtm-mode-{{this.mode}}" title="Extraction mode">{{this.mode}}</span>
             <span class="dtm-badge dtm-page-badge">p.{{this.page}}</span>
             <span class="dtm-badge">{{this.entryCount}} rows</span>
@@ -127,10 +135,58 @@
       </div>
       {{/each}}
 
+      {{!-- Text Scan groups — shown inline alongside normal groups --}}
+      {{#each textScanGroups}}
+      <div class="dtm-instance-block dtm-ts-group-block{{#if this.isActive}} dtm-ts-group-active{{/if}}"
+           data-text-group-id="{{this.id}}"
+           data-action="activateTextGroup"
+           title="Click to make this group the active draw target for new regions">
+        <div class="dtm-ts-group-header">
+          <div class="dtm-ts-group-row-1">
+            <i class="fas fa-align-left dtm-ts-group-icon"></i>
+            <input type="text" class="dtm-ts-group-name-input" value="{{this.name}}"
+                   placeholder="Text Scan name" data-text-group-id="{{this.id}}" />
+            <button type="button" data-action="editGroupRules" data-text-group-id="{{this.id}}"
+                    class="dtm-btn-secondary dtm-ts-edit-btn"
+                    title="Configure parsing rules and preview results">
+              <i class="fas fa-sliders-h"></i> Edit Rules
+            </button>
+            <button type="button" data-action="deleteTextScanGroup" data-text-group-id="{{this.id}}"
+                    class="dtm-icon-btn dtm-danger" title="Delete group and its regions">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+          <div class="dtm-ts-group-row-2">
+            <span class="dtm-badge">{{this.regions.length}} regions</span>
+            {{#if this.hasParsed}}
+            <span class="dtm-badge dtm-ts-parsed-badge">{{this.entryCount}} entries</span>
+            {{else}}
+            <span class="dtm-ts-no-rules-hint">No rules applied yet</span>
+            {{/if}}
+          </div>
+        </div>
+        {{#if this.regions.length}}
+        <div class="dtm-instance-regions dtm-ts-region-list">
+          {{#each this.regions}}
+          <div class="dtm-ts-region-item">
+            <i class="fas fa-file-pdf dtm-ts-region-icon"></i>
+            <span class="dtm-ts-region-label">p.{{this.page}} — {{this.name}}</span>
+            <button type="button" data-action="removeTextRegion" data-region-id="{{this.id}}"
+                    class="dtm-icon-btn dtm-danger" title="Remove this region from the group">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+      </div>
+      {{/each}}
+
+      {{!-- Ungrouped normal regions --}}
       <div class="dtm-instance-block dtm-ungrouped-block">
         <div class="dtm-instance-header{{#if isUngroupedActive}} dtm-instance-active{{/if}}"
              data-action="activateUngrouped"
-             title="Regions drawn while no group is active land here. Click to make Ungrouped the active target.">
+             title="Regions drawn while no group is active land here.">
           <span class="dtm-instance-chevron dtm-ungrouped-icon"><i class="fas fa-folder-open"></i></span>
           <span class="dtm-ungrouped-label">Ungrouped</span>
           <span class="dtm-badge">{{ungroupedRegions.length}}</span>
@@ -154,7 +210,7 @@
         </div>
       </div>
 
-      {{#unless totalRegionCount}}
+      {{#unless hasAnyContent}}
       <div class="dtm-region-empty">
         Draw selection boxes over table regions in the PDF to add them here.
       </div>

@@ -1,5 +1,7 @@
 import { TableCreator } from "../lib/TableCreator.js";
 import { PDFTableExtractor } from "../lib/PDFTableExtractor.js";
+import { TextScanParser } from "../lib/TextScanParser.js";
+import { TextScanRuleDialog } from "./TextScanRuleDialog.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -28,6 +30,10 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
   // ---- Region list ----
   #regions       = [];     // RegionRecord[]
   #activeRegionId = null;
+
+  // ---- Text scan groups ----
+  #textScanGroups    = [];   // TextScanGroup[]
+  #activeTextGroupId = null; // id of group that receives new text-scan regions
 
   // ---- Group state ----
   // A "family" is an invisible container holding a shared roleTemplate and a list of "instances".
@@ -58,7 +64,7 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     classes: ["dynamic-table-manager", "dtm-pdf-scanner"],
     tag: "div",
     window: { title: "Scan PDF", icon: "fas fa-file-pdf", resizable: true },
-    position: { width: 940, height: 660 },
+    position: { width: 1010, height: 660 },
     actions: {
       selectPdf:            PDFScannerWindow.#onSelectPdf,
       selectSingle:         PDFScannerWindow.#onSelectSingle,
@@ -76,6 +82,12 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       toggleInstanceExpand: PDFScannerWindow.#onToggleInstanceExpand,
       deleteInstance:       PDFScannerWindow.#onDeleteInstance,
       activateUngrouped:    PDFScannerWindow.#onActivateUngrouped,
+      selectTextScan:       PDFScannerWindow.#onSelectTextScan,
+      newTextScanGroup:     PDFScannerWindow.#onNewTextScanGroup,
+      activateTextGroup:    PDFScannerWindow.#onActivateTextGroup,
+      editGroupRules:       PDFScannerWindow.#onEditGroupRules,
+      deleteTextScanGroup:  PDFScannerWindow.#onDeleteTextScanGroup,
+      removeTextRegion:     PDFScannerWindow.#onRemoveTextRegion,
       cancel:               PDFScannerWindow.#onCancel
     }
   };
@@ -119,8 +131,23 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       }
     }
     const ungroupedRegions = this.#regions
-      .filter(r => !r.instanceId)
+      .filter(r => !r.instanceId && !r.textGroupId)
       .map(regionView);
+
+    // Text scan groups for context
+    const textScanGroups = this.#textScanGroups.map(g => {
+      const groupRegions = this.#regions
+        .filter(r => r.textGroupId === g.id)
+        .map(r => ({ id: r.id, page: r.page, name: r.name }));
+      return {
+        id:          g.id,
+        name:        g.name,
+        isActive:    this.#activeTextGroupId === g.id,
+        entryCount:  g.parsed?.entries.length ?? 0,
+        hasParsed:   !!g.parsed,
+        regions:     groupRegions
+      };
+    });
 
     return {
       hasPdf:      !!this.#pdfDoc,
@@ -128,14 +155,19 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       totalPages:  this.#totalPages,
       isFirstPage: this.#currentPage <= 1,
       isLastPage:  this.#currentPage >= this.#totalPages,
-      selectMode:     this.#selectMode,
-      isSelectSingle: this.#selectMode === "single",
-      isSelectMulti:  this.#selectMode === "multi",
+      selectMode:        this.#selectMode,
+      isSelectSingle:    this.#selectMode === "single",
+      isSelectMulti:     this.#selectMode === "multi",
+      isSelectTextScan:  this.#selectMode === "text-scan",
       hasFamilies:     this.#families.length > 0,
       instances,
       ungroupedRegions,
       isUngroupedActive: this.#activeInstanceId === null,
-      totalRegionCount:  this.#regions.length,
+      totalRegionCount:  this.#regions.filter(r => !r.textGroupId).length,
+      hasRegions:    this.#regions.filter(r => !r.textGroupId).length > 0 || this.#textScanGroups.length > 0,
+      hasAnyContent: this.#regions.filter(r => !r.textGroupId).length > 0 || this.#textScanGroups.length > 0,
+      textScanGroups,
+      hasTextScanGroups: textScanGroups.length > 0,
       activeRegion: activeRegion ? {
         id:            activeRegion.id,
         name:          this.#resolveRoleName(activeRegion),
@@ -244,9 +276,14 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     // Confirmed regions for current page
     for (const region of this.#regions.filter(r => r.page === this.#currentPage)) {
       const cr = this.#pdfRectToCanvas(region.rect, this.#currentViewport, dpr);
-      const isActive = region.id === this.#activeRegionId;
-      ctx.fillStyle   = isActive ? "rgba(100, 160, 255, 0.15)" : "rgba(100, 200, 100, 0.12)";
-      ctx.strokeStyle = isActive ? "rgba(100, 160, 255, 0.9)"  : "rgba(100, 200, 100, 0.8)";
+      const isActive   = region.id === this.#activeRegionId;
+      const isTextScan = region.mode === "text-scan";
+      ctx.fillStyle   = isActive   ? "rgba(100, 160, 255, 0.15)"
+                      : isTextScan ? "rgba(220, 160, 60, 0.12)"
+                      : "rgba(100, 200, 100, 0.12)";
+      ctx.strokeStyle = isActive   ? "rgba(100, 160, 255, 0.9)"
+                      : isTextScan ? "rgba(220, 160, 60, 0.85)"
+                      : "rgba(100, 200, 100, 0.8)";
       ctx.lineWidth   = 2;
       ctx.setLineDash([]);
       ctx.fillRect(cr.x, cr.y, cr.w, cr.h);
@@ -349,12 +386,25 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
         await this.#onRegionNameChange(ev.target);
       } else if (ev.target.classList.contains("dtm-instance-name")) {
         this.#onInstanceNameChange(ev.target);
+      } else if (ev.target.classList.contains("dtm-ts-group-name-input")) {
+        this.#onTextGroupNameChange(ev.target);
       }
     });
-    // Prevent activate action from firing when user clicks the instance name input
+    // Prevent activate actions from firing when user clicks name inputs
     list.addEventListener("click", (ev) => {
       if (ev.target.classList.contains("dtm-instance-name")) ev.stopPropagation();
+      if (ev.target.classList.contains("dtm-ts-group-name-input")) ev.stopPropagation();
     });
+  }
+
+  #onTextGroupNameChange(input) {
+    const id = input.dataset.textGroupId;
+    if (!id) return;
+    const group = this.#textScanGroups.find(g => g.id === id);
+    if (!group) return;
+    const newName = input.value.trim();
+    if (!newName) { input.value = group.name; return; }
+    group.name = newName;
   }
 
   async #onRegionNameChange(input) {
@@ -441,9 +491,38 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
     const dpr     = window.devicePixelRatio || 1;
     const pdfRect = canvasRectToPdf(canvasRect, this.#currentViewport, dpr);
-    const mode    = this.#selectMode === "single" ? "single" : "multi";
 
-    const parsed  = await this.#extractForRegion(this.#currentPage, pdfRect, mode);
+    // ---- Text scan mode: store raw items, route to a scan group ----
+    if (this.#selectMode === "text-scan") {
+      const rawItems = await this.#extractRawItemsForRegion(this.#currentPage, pdfRect);
+      const id = crypto.randomUUID();
+
+      // Auto-create a group if there isn't an active one.
+      let groupId = this.#activeTextGroupId;
+      if (!groupId || !this.#textScanGroups.find(g => g.id === groupId)) {
+        const newGroup = this.#makeTextScanGroup(`Text Scan ${this.#textScanGroups.length + 1}`);
+        this.#textScanGroups.push(newGroup);
+        groupId = newGroup.id;
+        this.#activeTextGroupId = groupId;
+      }
+
+      const regionCount = this.#regions.filter(r => r.textGroupId === groupId).length;
+      const name = `Region ${regionCount + 1} (p.${this.#currentPage})`;
+
+      this.#regions.push({
+        id, page: this.#currentPage, rect: pdfRect,
+        name, mode: "text-scan", parsed: null,
+        instanceId: null, slotIndex: null, customName: null,
+        rawItems, textGroupId: groupId
+      });
+
+      this.render();
+      return;
+    }
+
+    // ---- Normal single / multi col mode ----
+    const mode   = this.#selectMode === "single" ? "single" : "multi";
+    const parsed = await this.#extractForRegion(this.#currentPage, pdfRect, mode);
 
     const id = crypto.randomUUID();
 
@@ -467,11 +546,27 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
     this.#regions.push({
       id, page: this.#currentPage, rect: pdfRect, name, mode, parsed,
-      instanceId, slotIndex, customName: null
+      instanceId, slotIndex, customName: null,
+      rawItems: null, textGroupId: null
     });
 
     this.#activeRegionId = id;
     this.render();
+  }
+
+  async #extractRawItemsForRegion(pageNum, pdfRect) {
+    const page    = await this.#pdfDoc.getPage(pageNum);
+    const content = await page.getTextContent();
+    return TextScanParser.filterItemsToRect(content.items, pdfRect);
+  }
+
+  #makeTextScanGroup(name) {
+    return {
+      id:      crypto.randomUUID(),
+      name,
+      rules:   TextScanParser.defaultRules(),
+      parsed:  null
+    };
   }
 
   async #extractForRegion(pageNum, pdfRect, mode = "multi") {
@@ -587,6 +682,8 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       this.#families = [];
       this.#activeInstanceId = null;
       this.#expandedInstances = new Set();
+      this.#textScanGroups = [];
+      this.#activeTextGroupId = null;
       await this.render();
     };
     input.click();
@@ -607,8 +704,10 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
   #syncSelectButtons() {
     const single = this.element.querySelector("[data-action='selectSingle']");
     const multi  = this.element.querySelector("[data-action='selectMulti']");
+    const text   = this.element.querySelector("[data-action='selectTextScan']");
     single?.classList.toggle("dtm-active", this.#selectMode === "single");
-    multi?.classList.toggle("dtm-active", this.#selectMode === "multi");
+    multi?.classList.toggle("dtm-active",  this.#selectMode === "multi");
+    text?.classList.toggle("dtm-active",   this.#selectMode === "text-scan");
     const overlay = this.element.querySelector("#dtm-select-canvas");
     if (overlay) overlay.style.cursor = this.#selectMode ? "crosshair" : "default";
   }
@@ -707,14 +806,17 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   static async #onCreateTables() {
-    const withData = this.#regions.filter(r => r.parsed &&
+    const normalRegions = this.#regions.filter(r => !r.textGroupId);
+    const withData = normalRegions.filter(r => r.parsed &&
       (r.parsed.isMultiColumn ? r.parsed.columns[0].entries.length > 0 : r.parsed.entries.length > 0)
     );
-    if (withData.length === 0) {
-      ui.notifications.warn("No regions contain extractable table data.");
+    const groupsWithData = this.#textScanGroups.filter(g => g.parsed?.entries?.length > 0);
+
+    if (withData.length === 0 && groupsWithData.length === 0) {
+      ui.notifications.warn("No regions or text scan groups contain extractable table data.");
       return;
     }
-    const skipped = this.#regions.length - withData.length;
+    const skipped = normalRegions.length - withData.length;
     if (skipped > 0) ui.notifications.warn(`${skipped} region(s) had no data and were skipped.`);
 
     const makeCompound = this.#makeCompound;
@@ -742,6 +844,18 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       } else {
         allTables.push(await TableCreator.createSingleTable(tableName, region.parsed, folderId));
       }
+    }
+
+    // Create tables from text scan groups.
+    const skippedGroups = this.#textScanGroups.length - groupsWithData.length;
+    if (skippedGroups > 0 && this.#textScanGroups.length > 0) {
+      ui.notifications.warn(`${skippedGroups} text scan group(s) have no parsed data — use Edit Rules first.`);
+    }
+    for (const group of groupsWithData) {
+      const tableName = (this.#usePrefix && this.#tablePrefix.trim())
+        ? `${this.#tablePrefix.trim()} ${group.name}`
+        : group.name;
+      allTables.push(await TableCreator.createSingleTable(tableName, group.parsed, this.#folderId));
     }
 
     ui.notifications.info(`Created ${allTables.length} table(s) from PDF scan.`);
@@ -1017,6 +1131,84 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       ui.notifications.info(`Imported ${this.#regions.length} region(s)${schema === 2 ? ` into ${newFamilies.reduce((n,f)=>n+f.instances.length,0)} instance(s)` : ""}.`);
     };
     input.click();
+  }
+
+  // ---- Text scan actions ----
+
+  static #onSelectTextScan() {
+    this.#selectMode = this.#selectMode === "text-scan" ? null : "text-scan";
+    this.#currentRect = null;
+    this.#syncSelectButtons();
+  }
+
+  static #onNewTextScanGroup() {
+    const group = this.#makeTextScanGroup(`Text Scan ${this.#textScanGroups.length + 1}`);
+    this.#textScanGroups.push(group);
+    this.#activeTextGroupId = group.id;
+    this.render();
+  }
+
+  static #onActivateTextGroup(event, target) {
+    const id = target.closest("[data-text-group-id]")?.dataset.textGroupId;
+    if (!id) return;
+    this.#activeTextGroupId = this.#activeTextGroupId === id ? null : id;
+    this.render();
+  }
+
+  static #onEditGroupRules(event, target) {
+    event.stopPropagation?.();
+    const id = target.closest("[data-text-group-id]")?.dataset.textGroupId;
+    const group = this.#textScanGroups.find(g => g.id === id);
+    if (!group) return;
+
+    const regionItems = this.#regions
+      .filter(r => r.textGroupId === id)
+      .map(r => r.rawItems ?? []);
+
+    if (!regionItems.some(ri => ri.length > 0)) {
+      ui.notifications.warn("No scanned regions in this group yet. Draw regions first.");
+      return;
+    }
+
+    TextScanRuleDialog.open({
+      group,
+      regionItems,
+      onApply: (updated) => {
+        const idx = this.#textScanGroups.findIndex(g => g.id === updated.id);
+        if (idx !== -1) this.#textScanGroups[idx] = updated;
+        // Deselect after apply — next draw in Text Scan mode will start a fresh group
+        this.#activeTextGroupId = null;
+        this.render();
+      }
+    });
+  }
+
+  static async #onDeleteTextScanGroup(event, target) {
+    event.stopPropagation?.();
+    const id = target.closest("[data-text-group-id]")?.dataset.textGroupId;
+    const group = this.#textScanGroups.find(g => g.id === id);
+    if (!group) return;
+    const regionCount = this.#regions.filter(r => r.textGroupId === id).length;
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "Delete Text Scan Group" },
+      content: `<p>Delete "<strong>${group.name}</strong>" and its <strong>${regionCount}</strong> region(s)?</p>`,
+      rejectClose: false
+    });
+    if (!ok) return;
+    this.#regions = this.#regions.filter(r => r.textGroupId !== id);
+    this.#textScanGroups = this.#textScanGroups.filter(g => g.id !== id);
+    if (this.#activeTextGroupId === id) this.#activeTextGroupId = null;
+    this.#redrawOverlay();
+    this.render();
+  }
+
+  static #onRemoveTextRegion(event, target) {
+    event.stopPropagation?.();
+    const regionId = target.dataset.regionId;
+    if (!regionId) return;
+    this.#regions = this.#regions.filter(r => r.id !== regionId);
+    this.#redrawOverlay();
+    this.render();
   }
 
   static #onCancel() { this.close(); }

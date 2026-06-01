@@ -75,12 +75,14 @@ export class TableCreator {
     const low  = Math.round(Number(e.low));
     const high = Math.round(Number(e.high));
     if (!Number.isFinite(low) || !Number.isFinite(high) || low < 1 || high < low) return null;
-    return {
+    const result = {
       type:   CONST.TABLE_RESULT_TYPES.TEXT,
       name:   e.name,
       range:  [low, high],
       weight: high - low + 1
     };
+    if (e.description) result.description = e.description;
+    return result;
   }
 
   /**
