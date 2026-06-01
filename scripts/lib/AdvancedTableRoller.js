@@ -83,23 +83,29 @@ export class AdvancedTableRoller {
         ctx.outputs.push({ label: action.label || null, html });
 
       } else if (action.type === "group") {
-        await AdvancedTableRoller._evaluateActions(action.children ?? [], ctx);
+        const times = Math.max(1, parseInt(action.loop) || 1);
+        for (let i = 0; i < times; i++) {
+          await AdvancedTableRoller._evaluateActions(action.children ?? [], ctx);
+        }
 
       } else if (action.type === "conditional") {
         if (action.branches) {
-          let selectedBranch;
-          const die = action.die ?? "d6";
-          const roll = await new Roll(`1${die}`).evaluate();
-          for (const branch of action.branches) {
-            if (branch.isElse) continue;
-            if (roll.total >= (branch.low ?? 1) && roll.total <= (branch.high ?? 1)) {
-              selectedBranch = branch;
-              break;
+          const times = Math.max(1, parseInt(action.loop) || 1);
+          for (let i = 0; i < times; i++) {
+            let selectedBranch;
+            const die = action.die ?? "d6";
+            const roll = await new Roll(`1${die}`).evaluate();
+            for (const branch of action.branches) {
+              if (branch.isElse) continue;
+              if (roll.total >= (branch.low ?? 1) && roll.total <= (branch.high ?? 1)) {
+                selectedBranch = branch;
+                break;
+              }
             }
-          }
-          if (!selectedBranch) selectedBranch = action.branches.find(b => b.isElse);
-          if (selectedBranch) {
-            await AdvancedTableRoller._evaluateActions(selectedBranch.actions ?? [], ctx);
+            if (!selectedBranch) selectedBranch = action.branches.find(b => b.isElse);
+            if (selectedBranch) {
+              await AdvancedTableRoller._evaluateActions(selectedBranch.actions ?? [], ctx);
+            }
           }
         }
       }

@@ -395,6 +395,8 @@ export class AdvancedTableEditorWindow extends HandlebarsApplicationMixin(Applic
       <i class="fas fa-layer-group dtm-it-block-icon"></i>
     </span>
     <input class="dtm-it-col-label" type="text" data-field="groupLabel" data-action-id="${id}" value="${label}" placeholder="Group label…" />
+    <span class="dtm-at-loop-label" title="Repeat count">×</span>
+    <input type="number" class="dtm-at-loop-input" data-field="groupLoop" data-action-id="${id}" value="${action.loop ?? 1}" min="1" title="Repeat this group N times" />
     <button type="button" class="dtm-icon-btn"            data-action="duplicateAction" data-action-id="${id}" title="Duplicate group (with children)"><i class="fas fa-clone"></i></button>
     <button type="button" class="dtm-icon-btn dtm-danger" data-action="deleteAction"    data-action-id="${id}" title="Remove group"><i class="fas fa-trash"></i></button>
   </div>
@@ -454,6 +456,8 @@ export class AdvancedTableEditorWindow extends HandlebarsApplicationMixin(Applic
     </span>
     <input type="text" class="dtm-it-cond-die" data-field="condDie" data-action-id="${id}" value="${_esc(die)}" placeholder="d6" title="Die formula (e.g. d6, 2d6, d100)" />
     <input class="dtm-it-col-label dtm-it-cond-label" type="text" data-field="condLabel" data-action-id="${id}" value="${label}" placeholder="Label…" />
+    <span class="dtm-at-loop-label" title="Repeat count">×</span>
+    <input type="number" class="dtm-at-loop-input" data-field="condLoop" data-action-id="${id}" value="${action.loop ?? 1}" min="1" title="Repeat this conditional N times" />
     <button type="button" class="dtm-icon-btn"               data-action="addBranch"       data-action-id="${id}" title="Add range branch"><i class="fas fa-plus"></i> Branch</button>
     <button type="button" class="dtm-icon-btn"               data-action="duplicateAction" data-action-id="${id}" title="Duplicate conditional (with children)"><i class="fas fa-clone"></i></button>
     <button type="button" class="dtm-icon-btn dtm-danger"    data-action="deleteAction"    data-action-id="${id}" title="Remove"><i class="fas fa-trash"></i></button>
@@ -520,19 +524,33 @@ ${branchSections.join("\n")}
   _onExternalDragOver(ev) {
     if (this._drag) return; // internal tree drag — handled by tree dragover
     const zone = ev.target.closest(".dtm-at-doc-drop-zone");
-    if (!zone) return;
-    ev.preventDefault();
-    ev.dataTransfer.dropEffect = "link";
-    zone.classList.add("dtm-drop-active");
+    if (zone) {
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "link";
+      zone.classList.add("dtm-drop-active");
+      return;
+    }
+    // Accept drops anywhere on the tree — will create a new output action.
+    if (ev.target.closest(".dtm-it-tree")) {
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "link";
+    }
   }
 
   async _onExternalDrop(ev) {
     if (this._drag) return; // internal tree drag handles its own drop
     const zone = ev.target.closest(".dtm-at-doc-drop-zone");
-    if (!zone) return;
-    ev.preventDefault();
-    zone.classList.remove("dtm-drop-active");
-    await this._handleDocumentDrop(ev, zone.dataset.actionId);
+    if (zone) {
+      ev.preventDefault();
+      zone.classList.remove("dtm-drop-active");
+      await this._handleDocumentDrop(ev, zone.dataset.actionId);
+      return;
+    }
+    // Drop onto tree area (not an existing doc-zone) → create a new output action.
+    if (ev.target.closest(".dtm-it-tree")) {
+      ev.preventDefault();
+      await this._createDocumentOutput(ev);
+    }
   }
 
   async _handleDocumentDrop(ev, actionId) {
@@ -549,6 +567,29 @@ ${branchSections.join("\n")}
         a.documentName = name;
       });
     }, { render: "row", rowId: actionId });
+  }
+
+  async _createDocumentOutput(ev) {
+    let data;
+    try { data = TextEditor.getDragEventData(ev); } catch (_) { return; }
+    if (!data?.uuid) return;
+    const doc = await fromUuid(data.uuid).catch(() => null);
+    if (!doc) return;
+    const name = doc.name ?? data.uuid;
+    await this._editConfig(cfg => {
+      cfg.actions.push({
+        id: foundry.utils.randomID(),
+        type: "output",
+        label: name,
+        sourceType: "document",
+        value: "",
+        tableUuid: null,
+        tableName: null,
+        tableField: "name",
+        documentUuid: data.uuid,
+        documentName: name
+      });
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -746,6 +787,7 @@ ${branchSections.join("\n")}
         type: "conditional",
         label: "Conditional",
         die: "d6",
+        loop: 1,
         branches: [
           { id: foundry.utils.randomID(), label: "Branch 1", low: 1, high: 3, actions: [] },
           { id: foundry.utils.randomID(), label: "Branch 2", low: 4, high: 6, actions: [] }
@@ -760,7 +802,7 @@ ${branchSections.join("\n")}
     await this._editConfig(cfg => {
       const arr = this._resolveTargetArray(cfg.actions, parentId, parentSection);
       if (!arr) return;
-      arr.push({ id: foundry.utils.randomID(), type: "group", label: "Group", children: [] });
+      arr.push({ id: foundry.utils.randomID(), type: "group", label: "Group", loop: 1, children: [] });
     });
   }
 
@@ -930,6 +972,20 @@ ${branchSections.join("\n")}
     outputTableField: async function (t) {
       const id = t.dataset.actionId;
       await this._editConfig(cfg => this._mutateAction(cfg, id, a => { a.tableField = t.value; }), { render: "none" });
+    },
+
+    groupLoop: async function (t) {
+      const id = t.dataset.actionId;
+      await this._editConfig(cfg => this._mutateAction(cfg, id, a => {
+        a.loop = Math.max(1, parseInt(t.value) || 1);
+      }), { render: "none" });
+    },
+
+    condLoop: async function (t) {
+      const id = t.dataset.actionId;
+      await this._editConfig(cfg => this._mutateAction(cfg, id, a => {
+        a.loop = Math.max(1, parseInt(t.value) || 1);
+      }), { render: "none" });
     },
 
     groupLabel: async function (t) {

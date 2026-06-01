@@ -2646,6 +2646,21 @@ input.dtm-col-range:disabled {
   font-style: italic;
 }
 
+.dtm-at-loop-label {
+  font-size: 11px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.dtm-at-loop-input {
+  width: 38px;
+  text-align: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  min-height: 0;
+  height: auto;
+}
+
 .dtm-rc-header {
   display: flex;
   align-items: center;
