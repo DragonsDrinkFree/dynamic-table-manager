@@ -1,3 +1,5 @@
+import { ItemTemplateRoller } from "./ItemTemplateRoller.js";
+
 const DUMMY_RESULT_NAME = "Dynamic Table: Advanced Table";
 const DUMMY_RESULT_TEXT =
   "This result is a meta result for the Advanced Table type within the " +
@@ -83,14 +85,14 @@ export class AdvancedTableRoller {
         ctx.outputs.push({ label: action.label || null, html });
 
       } else if (action.type === "group") {
-        const times = Math.max(1, parseInt(action.loop) || 1);
+        const times = await AdvancedTableRoller._resolveLoopCount(action.loop);
         for (let i = 0; i < times; i++) {
           await AdvancedTableRoller._evaluateActions(action.children ?? [], ctx);
         }
 
       } else if (action.type === "conditional") {
         if (action.branches) {
-          const times = Math.max(1, parseInt(action.loop) || 1);
+          const times = await AdvancedTableRoller._resolveLoopCount(action.loop);
           for (let i = 0; i < times; i++) {
             let selectedBranch;
             const die = action.die ?? "d6";
@@ -174,6 +176,28 @@ export class AdvancedTableRoller {
   // ---------------------------------------------------------------------------
 
   /**
+   * Evaluate an Advanced Table's action tree and return its combined outputs as
+   * a single text result for use inside a parent table roll.  @UUID references
+   * in the raw output are resolved to their display name so the result reads
+   * cleanly as plain text (the parent's enrichment pass will re-linkify them).
+   */
+  static async _rollAdvancedTableAsResult(table, depth) {
+    const config = table.getFlag("dynamic-table-manager", "advancedTableConfig") ?? { actions: [] };
+    const ctx = { outputs: [] };
+    await AdvancedTableRoller._evaluateActions(config.actions ?? [], ctx);
+    if (!ctx.outputs.length) return null;
+
+    // Collapse outputs to a plain-text string: strip @UUID[uuid]{name} → name,
+    // then join with a semicolon separator.
+    const value = ctx.outputs.map(({ label, html }) => {
+      const plain = html.replace(/@UUID\[[^\]]+\]\{([^}]+)\}/g, "$1");
+      return label ? `${label}: ${plain}` : plain;
+    }).join("; ");
+
+    return { type: "text", value, description: "" };
+  }
+
+  /**
    * Roll a table and follow chained RollTable documents recursively until a
    * non-table result is reached.
    * @param {string} tableUuid
@@ -188,6 +212,29 @@ export class AdvancedTableRoller {
 
     const table = await fromUuid(tableUuid).catch(() => null);
     if (!(table instanceof RollTable)) return null;
+
+    // If the sub-table is one of our special types, route to the correct handler
+    // rather than bypassing to the meaningless dummy result.
+    const tableType = table.getFlag("dynamic-table-manager", "tableType");
+
+    if (tableType === "advanced-table") {
+      return AdvancedTableRoller._rollAdvancedTableAsResult(table, depth);
+    }
+
+    if (tableType === "item-template") {
+      const item = await ItemTemplateRoller.generate(table).catch(err => {
+        console.error("DTM AdvancedTableRoller: item-template sub-table failed", err);
+        return null;
+      });
+      return item ? { type: "document", doc: item } : null;
+    }
+
+    if (tableType === "journal-template") {
+      // Journal template creates a JournalEntry page as its output — run it and
+      // surface the table name as a plain text result (page linking is a future improvement).
+      try { await table.draw({ _dtmBypass: false }); } catch (_) { /* draw wrapper handles it */ }
+      return { type: "text", value: table.name, description: "" };
+    }
 
     const draw = await table.draw({ displayChat: false, _dtmBypass: true });
     const result = draw.results?.[0];
@@ -210,6 +257,23 @@ export class AdvancedTableRoller {
   // ---------------------------------------------------------------------------
   // Utilities
   // ---------------------------------------------------------------------------
+
+  /**
+   * Resolve the loop count for a group or conditional.
+   * Accepts a static integer (1, 2, 3…) or any dice formula ("d6", "2d4", "d6+1").
+   * Always returns at least 1.
+   */
+  static async _resolveLoopCount(loop) {
+    if (!loop && loop !== 0) return 1;
+    const n = Number(loop);
+    if (Number.isFinite(n)) return Math.max(1, Math.floor(n));
+    try {
+      const roll = await new Roll(String(loop)).evaluate();
+      return Math.max(1, Math.floor(roll.total));
+    } catch {
+      return 1;
+    }
+  }
 
   static async _evaluateInlineRolls(text) {
     if (typeof text !== "string" || !text.includes("[[")) return text;

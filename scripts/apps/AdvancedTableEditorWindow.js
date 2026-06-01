@@ -396,7 +396,7 @@ export class AdvancedTableEditorWindow extends HandlebarsApplicationMixin(Applic
     </span>
     <input class="dtm-it-col-label" type="text" data-field="groupLabel" data-action-id="${id}" value="${label}" placeholder="Group label…" />
     <span class="dtm-at-loop-label" title="Repeat count">×</span>
-    <input type="number" class="dtm-at-loop-input" data-field="groupLoop" data-action-id="${id}" value="${action.loop ?? 1}" min="1" title="Repeat this group N times" />
+    <input type="text" class="dtm-at-loop-input" data-field="groupLoop" data-action-id="${id}" value="${_esc(String(action.loop ?? 1))}" placeholder="1" title="Repeat N times — enter a number (3) or dice (d6, 2d4)" />
     <button type="button" class="dtm-icon-btn"            data-action="duplicateAction" data-action-id="${id}" title="Duplicate group (with children)"><i class="fas fa-clone"></i></button>
     <button type="button" class="dtm-icon-btn dtm-danger" data-action="deleteAction"    data-action-id="${id}" title="Remove group"><i class="fas fa-trash"></i></button>
   </div>
@@ -457,7 +457,7 @@ export class AdvancedTableEditorWindow extends HandlebarsApplicationMixin(Applic
     <input type="text" class="dtm-it-cond-die" data-field="condDie" data-action-id="${id}" value="${_esc(die)}" placeholder="d6" title="Die formula (e.g. d6, 2d6, d100)" />
     <input class="dtm-it-col-label dtm-it-cond-label" type="text" data-field="condLabel" data-action-id="${id}" value="${label}" placeholder="Label…" />
     <span class="dtm-at-loop-label" title="Repeat count">×</span>
-    <input type="number" class="dtm-at-loop-input" data-field="condLoop" data-action-id="${id}" value="${action.loop ?? 1}" min="1" title="Repeat this conditional N times" />
+    <input type="text" class="dtm-at-loop-input" data-field="condLoop" data-action-id="${id}" value="${_esc(String(action.loop ?? 1))}" placeholder="1" title="Repeat N times — enter a number (3) or dice (d6, 2d4)" />
     <button type="button" class="dtm-icon-btn"               data-action="addBranch"       data-action-id="${id}" title="Add range branch"><i class="fas fa-plus"></i> Branch</button>
     <button type="button" class="dtm-icon-btn"               data-action="duplicateAction" data-action-id="${id}" title="Duplicate conditional (with children)"><i class="fas fa-clone"></i></button>
     <button type="button" class="dtm-icon-btn dtm-danger"    data-action="deleteAction"    data-action-id="${id}" title="Remove"><i class="fas fa-trash"></i></button>
@@ -1026,16 +1026,18 @@ ${branchSections.join("\n")}
     },
 
     groupLoop: async function (t) {
-      const id = t.dataset.actionId;
+      const id  = t.dataset.actionId;
+      const val = t.value.trim() || 1;
       await this._editConfig(cfg => this._mutateAction(cfg, id, a => {
-        a.loop = Math.max(1, parseInt(t.value) || 1);
+        a.loop = val;
       }), { render: "none" });
     },
 
     condLoop: async function (t) {
-      const id = t.dataset.actionId;
+      const id  = t.dataset.actionId;
+      const val = t.value.trim() || 1;
       await this._editConfig(cfg => this._mutateAction(cfg, id, a => {
-        a.loop = Math.max(1, parseInt(t.value) || 1);
+        a.loop = val;
       }), { render: "none" });
     },
 
