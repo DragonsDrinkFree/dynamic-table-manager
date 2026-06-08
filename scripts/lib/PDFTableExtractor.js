@@ -86,6 +86,7 @@ export class PDFTableExtractor {
 
     const allRows = PDFTableExtractor.#clusterRows(filtered);
     if (allRows.length === 0) return null;
+    PDFTableExtractor.#fixRangeAlignment(allRows);
 
     // Identify data rows: rows whose leftmost item starts with a number.
     // Continuation rows (wrapped content with no range number) are merged into
@@ -173,6 +174,7 @@ export class PDFTableExtractor {
 
     const rows = PDFTableExtractor.#clusterRows(filtered);
     if (rows.length === 0) return { formula: "", isMultiColumn: false, entries: [] };
+    PDFTableExtractor.#fixRangeAlignment(rows);
 
     // Collect X positions of items whose first whitespace-separated token is a range.
     const rangeXs = [];
@@ -322,6 +324,84 @@ export class PDFTableExtractor {
   }
 
   // ---- Private helpers ----
+
+  /**
+   * Correct for range-token vertical misalignment.
+   *
+   * In some PDFs the range number inside a multi-line cell is vertically centred,
+   * so its Y coordinate falls BELOW the first content line of that entry.
+   * #clusterRows therefore puts the content line in an earlier row than the range
+   * token, causing the content to be appended to the PREVIOUS entry instead.
+   *
+   * Fix: scan consecutive row pairs.  If prevRow contains only content items (no
+   * range token) and currRow contains only a range token (no content items),
+   * merge the range token into prevRow (sorted by X so it comes first).
+   *
+   * Mutates the rows array in place; returns it for chaining.
+   */
+  static #fixRangeAlignment(rows) {
+    const isRangeTok = item => {
+      const tok = (item.str?.trim() ?? "").split(/\s+/)[0].replace(/[.):\]]+$/, "");
+      return PasteTableParser.NUMBER_LINE.test(tok);
+    };
+
+    const meanY = row => row.reduce((s, it) => s + it.transform[5], 0) / row.length;
+
+    for (let i = 1; i < rows.length; i++) {
+      const prevRow = rows[i - 1];
+      const currRow = rows[i];
+
+      // currRow must have at least one range token.
+      const rangeItems = currRow.filter(isRangeTok);
+      if (!rangeItems.length) continue;
+
+      // prevRow must have no range token.
+      if (prevRow.some(isRangeTok)) continue;
+
+      const hasContent = currRow.some(it => it.str?.trim() && !isRangeTok(it));
+
+      if (!hasContent) {
+        // Case 1: currRow is range-only — range number appears in its own Y cluster above
+        // the content (top-aligned range). Merge it into prevRow sorted left-to-right by X.
+        const merged = [...rangeItems, ...prevRow].sort((a, b) => a.transform[4] - b.transform[4]);
+        rows[i - 1] = merged;
+        const remaining = currRow.filter(it => !rangeItems.includes(it));
+        if (remaining.length === 0) {
+          rows.splice(i, 1);
+          i--;
+        } else {
+          rows[i] = remaining;
+        }
+      } else if (i >= 2) {
+        // Case 2: currRow has range + content mixed, and the range is bottom-aligned in
+        // the PDF cell. The FIRST content line sits alone in prevRow (higher Y), while the
+        // range number aligns with the LAST content line in currRow (same Y cluster).
+        //
+        // Detect by Y proximity: prevRow belongs to currRow's entry when it is
+        // Y-closer to currRow than to prevPrevRow. Normal continuation lines are
+        // Y-close to their own entry's rows and far from the next entry.
+        const maxRangeX = Math.max(...rangeItems.map(it => it.transform[4]));
+        if (!prevRow.every(it => it.transform[4] > maxRangeX)) continue;
+
+        const prevPrevRow  = rows[i - 2];
+        const gapAbove = meanY(prevPrevRow) - meanY(prevRow);
+        const gapBelow = meanY(prevRow)     - meanY(currRow);
+
+        if (gapAbove > gapBelow) {
+          // Preserve reading order: range token first, then the orphaned first-line items
+          // (prevRow, higher Y = earlier on page), then remaining content from currRow.
+          // Do NOT sort by X — overlapping X values between different visual rows scramble order.
+          const contentFromCurr = currRow.filter(it => !isRangeTok(it));
+          const merged = [...rangeItems, ...prevRow, ...contentFromCurr];
+          rows[i - 1] = merged;
+          rows.splice(i, 1);
+          i--;
+        }
+      }
+    }
+
+    return rows;
+  }
 
   /**
    * Keep only text items whose position falls within the bounding box.
