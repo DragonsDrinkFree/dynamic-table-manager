@@ -206,17 +206,25 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
         .map(id => this.#regions.find(r => r.id === id))
         .filter(Boolean)
         .map(r => {
+          const isImported = Array.isArray(r.parsed?.entries);
+          if (isImported) {
+            const ents = r.parsed.entries;
+            const low  = ents[0]?.low  ?? null;
+            const high = ents[ents.length - 1]?.high ?? null;
+            const rangeDisplay = (low != null && high != null)
+              ? (low === high ? `${low}` : `${low}-${high}`) : null;
+            return { id: r.id, page: r.page, isImported: true,
+                     rangeDisplay, entryCount: ents.length,
+                     namePreview: r.name, hasRange: rangeDisplay != null };
+          }
           const low = r.parsed?.low ?? null;
           const high = r.parsed?.high ?? null;
           const rangeDisplay = low != null
-            ? (low === high ? `${low}` : `${low}-${high}`)
-            : null;
-          return {
-            id: r.id, page: r.page,
-            rangeDisplay,
-            namePreview: (r.parsed?.name ?? "").slice(0, 40),
-            hasRange: low != null
-          };
+            ? (low === high ? `${low}` : `${low}-${high}`) : null;
+          return { id: r.id, page: r.page, isImported: false,
+                   rangeDisplay, entryCount: null,
+                   namePreview: (r.parsed?.name ?? "").slice(0, 40),
+                   hasRange: low != null };
         });
       return { id: g.id, name: g.name, isActive: g.id === this.#activeSliceGroupId,
                isExpanded: !this.#collapsedGroups.has(g.id),
@@ -283,6 +291,7 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     this.#attachCanvasListeners();
     this.#attachRegionListeners();
     this.#attachFooterListeners();
+    this.#syncToolbar();
 
     // Page jump input
     const pageInput = this.element.querySelector(".dtm-page-input");
@@ -499,6 +508,54 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       if (ev.target.classList.contains("dtm-mp-group-name-input")) ev.stopPropagation();
       if (ev.target.classList.contains("dtm-slice-group-name-input")) ev.stopPropagation();
     });
+
+    // Drag ungrouped region items into slice groups
+    list.addEventListener("dragstart", (ev) => {
+      const item = ev.target.closest(".dtm-region-item[data-region-id]");
+      if (!item) { ev.preventDefault(); return; }
+      ev.dataTransfer.setData("text/plain", item.dataset.regionId);
+      ev.dataTransfer.effectAllowed = "move";
+    });
+
+    list.addEventListener("dragover", (ev) => {
+      const groupEl = ev.target.closest("[data-slice-group-id]");
+      if (!groupEl) return;
+      if (!ev.dataTransfer.types.includes("text/plain")) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "move";
+      groupEl.classList.add("dtm-drag-over");
+    });
+
+    list.addEventListener("dragleave", (ev) => {
+      const groupEl = ev.target.closest("[data-slice-group-id]");
+      if (!groupEl || groupEl.contains(ev.relatedTarget)) return;
+      groupEl.classList.remove("dtm-drag-over");
+    });
+
+    list.addEventListener("drop", (ev) => {
+      const groupEl = ev.target.closest("[data-slice-group-id]");
+      if (!groupEl) return;
+      ev.preventDefault();
+      groupEl.classList.remove("dtm-drag-over");
+      const regionId = ev.dataTransfer.getData("text/plain");
+      this.#onDropRegionIntoSliceGroup(regionId, groupEl.dataset.sliceGroupId);
+    });
+  }
+
+  #onDropRegionIntoSliceGroup(regionId, groupId) {
+    if (!regionId || !groupId) return;
+    const region = this.#regions.find(r => r.id === regionId);
+    const group  = this.#sliceGroups.find(g => g.id === groupId);
+    if (!region || !group) return;
+    if (region.instanceId || region.textGroupId || region.multiPageGroupId || region.sliceGroupId) return;
+    if (region.parsed?.isMultiColumn) {
+      ui.notifications.warn("Multi-column regions cannot be added to a slice group.");
+      return;
+    }
+    if (!region.parsed?.entries?.length) return;
+    region.sliceGroupId = groupId;
+    group.regionIds.push(regionId);
+    this.render();
   }
 
   #onTextGroupNameChange(input) {
@@ -1134,20 +1191,39 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
     // Create tables from slice groups.
     for (const group of this.#sliceGroups) {
-      const entries = [];
-      let autoIndex = 1;
+      const rawEntries = [];
+
       for (const id of group.regionIds) {
         const r = this.#regions.find(r => r.id === id);
-        if (!r?.parsed?.name?.trim()) continue;
-        const low  = r.parsed.low  ?? autoIndex;
-        const high = r.parsed.high ?? low;
-        entries.push({ low, high, name: r.parsed.name });
-        autoIndex = high + 1;
+        if (!r?.parsed) continue;
+        if (Array.isArray(r.parsed.entries)) {
+          rawEntries.push(...r.parsed.entries.map(e => ({ low: e.low, high: e.high, name: e.name })));
+        } else if (r.parsed.name?.trim()) {
+          rawEntries.push({ low: r.parsed.low ?? null, high: r.parsed.high ?? null, name: r.parsed.name });
+        }
       }
-      if (!entries.length) continue;
-      const maxHigh = Math.max(...entries.map(e => e.high));
-      const formula = maxHigh > 0 ? `1d${maxHigh}` : `1d${entries.length}`;
-      const merged  = { isMultiColumn: false, entries, formula };
+
+      if (!rawEntries.length) continue;
+
+      // Sort known-low entries by value, null-low entries at end
+      rawEntries.sort((a, b) => {
+        if (a.low == null && b.low == null) return 0;
+        if (a.low == null) return 1;
+        if (b.low == null) return -1;
+        return a.low - b.low;
+      });
+
+      // Auto-number null-low entries from max known high + 1
+      const knownHighs = rawEntries.filter(e => e.low != null).map(e => e.high);
+      let autoIndex = knownHighs.length > 0 ? Math.max(...knownHighs) + 1 : 1;
+      for (const e of rawEntries) {
+        if (e.low == null) { e.low = autoIndex; e.high = autoIndex; }
+        autoIndex = e.high + 1;
+      }
+
+      const maxHigh = Math.max(...rawEntries.map(e => e.high));
+      const formula = maxHigh > 0 ? `1d${maxHigh}` : `1d${rawEntries.length}`;
+      const merged  = { isMultiColumn: false, entries: rawEntries, formula };
       const tableName = (this.#usePrefix && this.#tablePrefix.trim())
         ? `${this.#tablePrefix.trim()} ${group.name}`
         : group.name;
@@ -1647,8 +1723,15 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     const region = this.#regions.find(r => r.id === regionId);
     if (!region?.sliceGroupId) return;
     const group = this.#sliceGroups.find(g => g.id === region.sliceGroupId);
-    if (group) group.regionIds = group.regionIds.filter(id => id !== regionId);
-    this.#regions = this.#regions.filter(r => r.id !== regionId);
+    if (Array.isArray(region.parsed?.entries)) {
+      // Imported normal region — unlink only, return to ungrouped
+      region.sliceGroupId = null;
+      if (group) group.regionIds = group.regionIds.filter(id => id !== regionId);
+    } else {
+      // Slice-drawn region — delete entirely
+      if (group) group.regionIds = group.regionIds.filter(id => id !== regionId);
+      this.#regions = this.#regions.filter(r => r.id !== regionId);
+    }
     if (this.#activeRegionId === regionId) this.#activeRegionId = null;
     this.#redrawOverlay();
     this.render();

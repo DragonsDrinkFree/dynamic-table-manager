@@ -1055,7 +1055,8 @@ input.dtm-col-range:disabled {
   font-size: 12px;
 }
 
-.dtm-scanner-toolbar button.dtm-active {
+.dtm-scanner-toolbar button.dtm-active,
+.dtm-subtoolbar button.dtm-active {
   background: rgba(100, 160, 255, 0.15);
   border-color: rgba(100, 160, 255, 0.5);
   color: rgba(160, 200, 255, 0.95);
@@ -3118,8 +3119,8 @@ input.dtm-col-range:disabled {
 }
 
 .dtm-slice-group-block.dtm-slice-group-active {
-  border-color: rgba(40, 180, 160, 0.65);
-  background: rgba(40, 180, 160, 0.04);
+  border-left: 3px solid rgba(40, 180, 160, 0.85);
+  background: rgba(40, 180, 160, 0.06);
 }
 
 .dtm-slice-group-header {
@@ -3198,6 +3199,29 @@ input.dtm-col-range:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
   opacity: 0.7;
+  font-size: 10px;
+}
+
+/* ---- Drag-and-drop: normal regions into slice groups ---- */
+
+.dtm-region-item[draggable="true"] { cursor: grab; }
+.dtm-region-item[draggable="true"]:active { cursor: grabbing; }
+
+.dtm-slice-group-block.dtm-drag-over {
+  border-color: rgba(40, 180, 160, 0.9) !important;
+  background: rgba(40, 180, 160, 0.1) !important;
+  box-shadow: 0 0 0 2px rgba(40, 180, 160, 0.3);
+}
+
+.dtm-slice-region-item.dtm-slice-imported {
+  background: rgba(40, 180, 160, 0.06);
+  border-left: 2px solid rgba(40, 180, 160, 0.4);
+  padding-left: 4px;
+}
+
+.dtm-slice-import-badge {
+  background: rgba(40, 180, 160, 0.2);
+  flex-shrink: 0;
   font-size: 10px;
 }
 

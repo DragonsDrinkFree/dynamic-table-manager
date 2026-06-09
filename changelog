@@ -6,9 +6,12 @@
 - Item Template/advanced tables/journal templates can have results drawn from advanced tables.
 - Text Scan Mode for PDF scan to get text blocks.
 - implemented "Manual Slice" To create complicated slices of table that dont fit normal detections.
+- Able to drag tables into groups to combine them
+- new Sub-tool Interface for PDF scan
 
 ## Minor
 - Fixed bug in reading tables with centered numbers and multi-line results. 
+- Css tweaks for visual clarity
 
 # v1.5.0
 
