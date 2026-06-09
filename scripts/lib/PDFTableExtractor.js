@@ -52,6 +52,76 @@ export class PDFTableExtractor {
   }
 
   /**
+   * Merge multiple parsed results (from multi-page scan groups) into one.
+   * Entries are concatenated in array order and sorted by low value.
+   * Multi-column results merge per column (same column count assumed for all).
+   *
+   * @param {object[]} parsedArray  — array of objects returned by extract()
+   * @returns {{ formula: string, isMultiColumn: boolean, entries?: [], columns?: [] } | null}
+   */
+  static mergeResults(parsedArray) {
+    if (!parsedArray?.length) return null;
+    const first = parsedArray.find(p => p);
+    if (!first) return null;
+
+    if (first.isMultiColumn) {
+      const colCount = first.columns?.length ?? 1;
+      const mergedColumns = Array.from({ length: colCount }, (_, i) => ({
+        header:  first.columns[i]?.header ?? `Column ${i + 1}`,
+        entries: parsedArray.flatMap(p => p.columns?.[i]?.entries ?? [])
+      }));
+      const maxHigh = Math.max(0, ...mergedColumns[0].entries.map(e => e.high ?? e.low ?? 0));
+      const count   = mergedColumns[0].entries.length;
+      const formula = maxHigh > 0 ? `1d${maxHigh}` : count > 0 ? `1d${count}` : "";
+      return { isMultiColumn: true, columnCount: colCount, columns: mergedColumns, formula };
+    } else {
+      const allEntries = parsedArray.flatMap(p => p.entries ?? []);
+      allEntries.sort((a, b) => a.low - b.low);
+      const maxHigh = Math.max(0, ...allEntries.map(e => e.high ?? e.low ?? 0));
+      const formula = maxHigh > 0 ? `1d${maxHigh}` : allEntries.length > 0 ? `1d${allEntries.length}` : "";
+      return { isMultiColumn: false, entries: allEntries, formula };
+    }
+  }
+
+  /**
+   * Extract a single table entry from a bounding box — one box equals one entry.
+   * Immune to range bottom-alignment issues because all text in the box belongs to one entry.
+   * Returns { low, high, name } where low/high are null if no range token was found.
+   */
+  static extractSlice(textItems, rect) {
+    const items = PDFTableExtractor.#filterItems(textItems, rect);
+    if (!items.length) return { low: null, high: null, name: "" };
+
+    const rows = PDFTableExtractor.#clusterRows(items);
+    let low = null, high = null;
+    const contentParts = [];
+
+    for (const row of rows) {
+      for (const item of row) {
+        const str = item.str?.trim() ?? "";
+        if (!str) continue;
+
+        if (low === null) {
+          const tok = str.split(/\s+/)[0].replace(/[.):\]]+$/, "");
+          const m = tok.match(PasteTableParser.NUMBER_LINE);
+          if (m) {
+            low  = parseInt(m[1] ?? m[3]);
+            const rawHigh = m[2] !== undefined ? parseInt(m[2]) : low;
+            high = (rawHigh === 0 && low > 0) ? 100 : rawHigh;
+            const afterTok = str.slice(tok.length).trim();
+            if (afterTok) contentParts.push(afterTok);
+            continue;
+          }
+        }
+
+        contentParts.push(str);
+      }
+    }
+
+    return { low, high, name: contentParts.join(" ").trim() };
+  }
+
+  /**
    * Infer a dice formula for the table.
    * Priority 1: a standalone dice token in the region (e.g. "d100", "D12", "d%").
    * Priority 2: "1d{rowCount}" based on how many rows were extracted.

@@ -7,16 +7,16 @@
       <button type="button" data-action="selectPdf" class="dtm-btn-secondary">
         <i class="fas fa-folder-open"></i> Select PDF
       </button>
-      <button type="button" data-action="selectSingle"
-              class="dtm-btn-secondary{{#if isSelectSingle}} dtm-active{{/if}}"
+      <button type="button" data-action="selectSingleToolbox"
+              class="dtm-btn-secondary{{#if isSelectSingleToolbox}} dtm-active{{/if}}"
               {{#unless hasPdf}}disabled{{/unless}}
-              title="Draw a region around a single-column table. Handles tables printed across two page-columns (e.g. d100 split into two halves).">
+              title="Single-column table tools">
         <i class="fas fa-list-ol"></i> Single Col
       </button>
-      <button type="button" data-action="selectMulti"
-              class="dtm-btn-secondary{{#if isSelectMulti}} dtm-active{{/if}}"
+      <button type="button" data-action="selectMultiToolbox"
+              class="dtm-btn-secondary{{#if isSelectMultiToolbox}} dtm-active{{/if}}"
               {{#unless hasPdf}}disabled{{/unless}}
-              title="Draw a region around a true multi-column data table (range + multiple data columns).">
+              title="Multi-column table tools">
         <i class="fas fa-table-cells"></i> Multi Col
       </button>
       <button type="button" data-action="selectTextScan"
@@ -49,6 +49,28 @@
       {{/if}}
     </div>
 
+    {{!-- Sub-toolbar: shown when a toolbox is open --}}
+    <div class="dtm-subtoolbar"{{#unless toolboxOpen}} hidden{{/unless}}>
+      <button type="button" data-action="selectSinglePage"
+              class="dtm-btn-secondary{{#if isSelectSinglePage}} dtm-active{{/if}}"
+              {{#unless hasPdf}}disabled{{/unless}}
+              title="Draw one region for a single-page table scan">
+        <i class="fas fa-file"></i> Single Page
+      </button>
+      <button type="button" data-action="selectMultiPage"
+              class="dtm-btn-secondary{{#if isSelectMultiPage}} dtm-active{{/if}}"
+              {{#unless hasPdf}}disabled{{/unless}}
+              title="Draw multiple regions across pages — they merge into one table">
+        <i class="fas fa-copy"></i> Multi Page
+      </button>
+      <button type="button" data-action="selectSlice"
+              class="dtm-btn-secondary{{#if isSelectSlice}} dtm-active{{/if}}"
+              {{#unless hasPdf}}disabled{{/unless}}
+              title="Draw one box per table entry — each box detected as a single result, immune to alignment issues">
+        <i class="fas fa-scissors"></i> Slice
+      </button>
+    </div>
+
     <input type="file" id="dtm-pdf-file-input" accept=".pdf" style="display:none">
     <input type="file" id="dtm-recipe-file-input" accept="application/json,.json" style="display:none">
 
@@ -57,7 +79,7 @@
       <div class="dtm-pdf-empty">
         <i class="fas fa-file-pdf"></i>
         <p>Click <strong>Select PDF</strong> to open a file.</p>
-        <p class="dtm-pdf-empty-hint">Pick <strong>Single Col</strong>, <strong>Multi Col</strong>, or <strong>Text Scan</strong>, then draw regions over table content.</p>
+        <p class="dtm-pdf-empty-hint">Pick <strong>Single Col</strong> or <strong>Multi Col</strong> to choose a tool, then draw regions over table content. Use <strong>Multi Page</strong> to merge a table that spans multiple pages.</p>
       </div>
       {{/unless}}
       <canvas id="dtm-pdf-canvas"></canvas>
@@ -143,6 +165,11 @@
            title="Click to make this group the active draw target for new regions">
         <div class="dtm-ts-group-header">
           <div class="dtm-ts-group-row-1">
+            <button type="button" class="dtm-instance-chevron"
+                    data-action="toggleGroupExpand" data-group-id="{{this.id}}"
+                    title="Expand / collapse">
+              <i class="fas {{#if this.isExpanded}}fa-chevron-down{{else}}fa-chevron-right{{/if}}"></i>
+            </button>
             <i class="fas fa-align-left dtm-ts-group-icon"></i>
             <input type="text" class="dtm-ts-group-name-input" value="{{this.name}}"
                    placeholder="Text Scan name" data-text-group-id="{{this.id}}" />
@@ -165,6 +192,7 @@
             {{/if}}
           </div>
         </div>
+        {{#if this.isExpanded}}
         {{#if this.regions.length}}
         <div class="dtm-instance-regions dtm-ts-region-list">
           {{#each this.regions}}
@@ -178,6 +206,104 @@
           </div>
           {{/each}}
         </div>
+        {{/if}}
+        {{/if}}
+      </div>
+      {{/each}}
+
+      {{!-- Multi-page scan groups --}}
+      {{#each multiPageGroups}}
+      <div class="dtm-instance-block dtm-mp-group-block{{#if this.isActive}} dtm-mp-group-active{{/if}}"
+           data-mp-group-id="{{this.id}}"
+           data-action="activateMpGroup"
+           title="Click to make this group the active draw target for new regions">
+        <div class="dtm-mp-group-header">
+          <div class="dtm-mp-group-row-1">
+            <button type="button" class="dtm-instance-chevron"
+                    data-action="toggleGroupExpand" data-group-id="{{this.id}}"
+                    title="Expand / collapse">
+              <i class="fas {{#if this.isExpanded}}fa-chevron-down{{else}}fa-chevron-right{{/if}}"></i>
+            </button>
+            <i class="fas fa-copy dtm-mp-group-icon"></i>
+            <input type="text" class="dtm-mp-group-name-input" value="{{this.name}}"
+                   placeholder="Scan group name" data-mp-group-id="{{this.id}}" />
+            <span class="dtm-badge dtm-mode-badge dtm-mode-{{this.mode}}" title="Extraction mode">{{this.mode}}</span>
+            <button type="button" data-action="deleteMpGroup" data-mp-group-id="{{this.id}}"
+                    class="dtm-icon-btn dtm-danger" title="Delete group and its regions">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+          <div class="dtm-mp-group-row-2">
+            <span class="dtm-badge">{{this.regions.length}} regions</span>
+            <span class="dtm-badge dtm-mp-entry-badge">{{this.totalEntryCount}} entries</span>
+          </div>
+        </div>
+        {{#if this.isExpanded}}
+        {{#if this.regions.length}}
+        <div class="dtm-instance-regions dtm-mp-region-list">
+          {{#each this.regions}}
+          <div class="dtm-mp-region-item">
+            <i class="fas fa-file-pdf dtm-mp-region-icon"></i>
+            <span class="dtm-mp-region-label">p.{{this.page}} — {{this.name}}</span>
+            <span class="dtm-badge">{{this.entryCount}}</span>
+            <button type="button" data-action="removeMpRegion" data-region-id="{{this.id}}"
+                    class="dtm-icon-btn dtm-danger" title="Remove this region from the group">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+        {{/if}}
+      </div>
+      {{/each}}
+
+      {{!-- Slice scan groups --}}
+      {{#each sliceGroups}}
+      <div class="dtm-instance-block dtm-slice-group-block{{#if this.isActive}} dtm-slice-group-active{{/if}}"
+           data-slice-group-id="{{this.id}}"
+           data-action="activateSliceGroup"
+           title="Click to make this the active slice group">
+        <div class="dtm-slice-group-header">
+          <div class="dtm-slice-group-row-1">
+            <button type="button" class="dtm-instance-chevron"
+                    data-action="toggleGroupExpand" data-group-id="{{this.id}}"
+                    title="Expand / collapse">
+              <i class="fas {{#if this.isExpanded}}fa-chevron-down{{else}}fa-chevron-right{{/if}}"></i>
+            </button>
+            <i class="fas fa-scissors dtm-slice-group-icon"></i>
+            <input type="text" class="dtm-slice-group-name-input" value="{{this.name}}"
+                   placeholder="Slice group name" data-slice-group-id="{{this.id}}" />
+            <button type="button" data-action="deleteSliceGroup" data-slice-group-id="{{this.id}}"
+                    class="dtm-icon-btn dtm-danger" title="Delete group and its slices">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+          <div class="dtm-slice-group-row-2">
+            <span class="dtm-badge">{{this.regionCount}} slices</span>
+          </div>
+        </div>
+        {{#if this.isExpanded}}
+        {{#if this.regions.length}}
+        <div class="dtm-instance-regions dtm-slice-region-list">
+          {{#each this.regions}}
+          <div class="dtm-slice-region-item">
+            <i class="fas fa-file-pdf dtm-slice-region-icon"></i>
+            <span class="dtm-badge dtm-page-badge">p.{{this.page}}</span>
+            {{#if this.hasRange}}
+            <span class="dtm-badge dtm-slice-range-badge">{{this.rangeDisplay}}</span>
+            {{else}}
+            <span class="dtm-slice-range-missing" title="No range number detected — redraw the box to include the entry number">?</span>
+            {{/if}}
+            <span class="dtm-slice-region-label" title="{{this.namePreview}}">{{this.namePreview}}</span>
+            <button type="button" data-action="removeSliceRegion" data-region-id="{{this.id}}"
+                    class="dtm-icon-btn dtm-danger" title="Remove this slice">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
         {{/if}}
       </div>
       {{/each}}

@@ -3033,3 +3033,171 @@ input.dtm-col-range:disabled {
   opacity: 0.7;
 }
 
+/* ===== PDF Scanner — Sub-toolbar =========================================== */
+
+.dtm-subtoolbar {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(127, 127, 127, 0.2);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.dtm-subtoolbar button {
+  font-size: 11px;
+  padding: 2px 10px;
+}
+
+/* ===== PDF Scanner — Multi-page scan groups ================================= */
+
+.dtm-mp-group-block {
+  border-left: 2px solid rgba(160, 100, 220, 0.35);
+}
+
+.dtm-mp-group-block.dtm-mp-group-active {
+  border-left-color: rgba(160, 100, 220, 0.85);
+}
+
+.dtm-mp-group-header {
+  padding: 3px 6px 2px;
+  cursor: pointer;
+}
+
+.dtm-mp-group-row-1 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dtm-mp-group-row-2 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 2px;
+  padding-left: 18px;
+}
+
+.dtm-mp-group-icon {
+  opacity: 0.5;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.dtm-mp-group-name-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+
+.dtm-mp-entry-badge {
+  background: rgba(160, 100, 220, 0.18);
+}
+
+.dtm-mp-region-list {
+  border-top: 1px solid rgba(127, 127, 127, 0.12);
+}
+
+.dtm-mp-region-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.dtm-mp-region-icon { opacity: 0.45; flex-shrink: 0; font-size: 10px; }
+.dtm-mp-region-label { flex: 1; opacity: 0.8; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- Slice group blocks — teal accent ---- */
+
+.dtm-slice-group-block {
+  margin-bottom: 4px;
+  border: 1px solid rgba(40, 180, 160, 0.3);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.dtm-slice-group-block.dtm-slice-group-active {
+  border-color: rgba(40, 180, 160, 0.65);
+  background: rgba(40, 180, 160, 0.04);
+}
+
+.dtm-slice-group-header {
+  padding: 3px 6px 2px;
+}
+
+.dtm-slice-group-row-1 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(40, 180, 160, 0.08);
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.dtm-slice-group-row-1 input {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  background: transparent;
+  border: none;
+  color: inherit;
+}
+
+.dtm-slice-group-row-2 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 2px;
+  padding-left: 18px;
+}
+
+.dtm-slice-group-icon {
+  color: rgba(40, 180, 160, 0.7);
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.dtm-slice-region-list {
+  border-top: 1px solid rgba(40, 180, 160, 0.12);
+}
+
+.dtm-slice-region-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.dtm-slice-region-icon {
+  color: rgba(40, 180, 160, 0.5);
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.dtm-slice-range-badge {
+  background: rgba(40, 180, 160, 0.2);
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.dtm-slice-range-missing {
+  color: rgba(255, 140, 60, 0.85);
+  font-weight: bold;
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.dtm-slice-region-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+  font-size: 10px;
+}
+
