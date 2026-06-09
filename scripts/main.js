@@ -3,6 +3,7 @@ import { TableEditorWindow } from "./apps/TableEditorWindow.js";
 import { CreateTableDialog } from "./apps/CreateTableDialog.js";
 import { ItemTemplateRoller } from "./lib/ItemTemplateRoller.js";
 import { JournalTemplateRoller } from "./lib/JournalTemplateRoller.js";
+import { AdvancedTableRoller } from "./lib/AdvancedTableRoller.js";
 
 const MODULE_ID = "dynamic-table-manager";
 
@@ -101,6 +102,16 @@ Hooks.once("ready", () => {
         } catch (err) {
           console.error(`${MODULE_ID} | Journal Template generation failed`, err);
           ui.notifications.error("Journal generation failed. Check the console for details.");
+        }
+        return { roll: null, results: [] };
+      }
+
+      if (tableType === "advanced-table") {
+        try {
+          await AdvancedTableRoller.roll(this);
+        } catch (err) {
+          console.error(`${MODULE_ID} | Advanced Table roll failed`, err);
+          ui.notifications.error("Advanced Table roll failed. Check the console for details.");
         }
         return { roll: null, results: [] };
       }

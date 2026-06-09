@@ -1,0 +1,122 @@
+{{!-- Text Scan Rule Dialog --}}
+<div class="dtm-ts-dialog-shell">
+
+  {{!-- Top: raw text (left) + scrollable rules (right) --}}
+  <div class="dtm-ts-dialog-container">
+
+    <div class="dtm-ts-raw-pane">
+      <div class="dtm-ts-pane-label">Extracted Text</div>
+      <textarea class="dtm-ts-raw-text" readonly>{{rawText}}</textarea>
+    </div>
+
+    <div class="dtm-ts-rules-pane">
+
+      <div class="dtm-ts-rule-section">
+        <div class="dtm-ts-rule-heading">Entry Boundary</div>
+        <label class="dtm-ts-radio-row">
+          <input type="radio" name="splitMode" value="colon-prefix" data-field="splitMode" {{#if splitColon}}checked{{/if}}>
+          Colon-prefix &nbsp;<em class="dtm-ts-hint">Word(s): rest…</em>
+        </label>
+        <label class="dtm-ts-radio-row">
+          <input type="radio" name="splitMode" value="font" data-field="splitMode" {{#if splitFont}}checked{{/if}}>
+          Bold / large font
+        </label>
+        <label class="dtm-ts-radio-row">
+          <input type="radio" name="splitMode" value="regex" data-field="splitMode" {{#if splitRegex}}checked{{/if}}>
+          Custom regex
+        </label>
+        {{#if splitRegex}}
+        <div class="dtm-ts-sub-row">
+          <label>Pattern</label>
+          <input type="text" data-field="splitPattern" value="{{splitPattern}}" placeholder="e.g. ^[A-Z][a-z]+:" class="dtm-ts-input" />
+        </div>
+        {{/if}}
+      </div>
+
+      <div class="dtm-ts-rule-section">
+        <div class="dtm-ts-rule-heading">Result Name</div>
+        <label class="dtm-ts-radio-row">
+          <input type="radio" name="nameCapture" value="before-colon" data-field="nameCapture" {{#if nameBeforeColon}}checked{{/if}}>
+          Before first colon
+        </label>
+        <label class="dtm-ts-radio-row">
+          <input type="radio" name="nameCapture" value="full" data-field="nameCapture" {{#if nameFull}}checked{{/if}}>
+          Full entry text
+        </label>
+        <label class="dtm-ts-radio-row">
+          <input type="radio" name="nameCapture" value="regex" data-field="nameCapture" {{#if nameRegex}}checked{{/if}}>
+          Custom regex
+        </label>
+        {{#if nameRegex}}
+        <div class="dtm-ts-sub-row">
+          <label>Pattern</label>
+          <input type="text" data-field="namePattern" value="{{namePattern}}" placeholder="e.g. ^(.+?):" class="dtm-ts-input" />
+          <label>Group</label>
+          <input type="number" data-field="nameGroup" value="{{nameGroup}}" min="0" class="dtm-ts-num-input" />
+        </div>
+        {{/if}}
+      </div>
+
+      <div class="dtm-ts-rule-section">
+        <div class="dtm-ts-rule-heading">Result Description</div>
+        <label class="dtm-ts-radio-row">
+          <input type="radio" name="descCapture" value="after-colon" data-field="descCapture" {{#if descAfterColon}}checked{{/if}}>
+          After first colon
+        </label>
+        <label class="dtm-ts-radio-row">
+          <input type="radio" name="descCapture" value="rest" data-field="descCapture" {{#if descRest}}checked{{/if}}>
+          Remaining lines (after entry start)
+        </label>
+        <label class="dtm-ts-radio-row">
+          <input type="radio" name="descCapture" value="full" data-field="descCapture" {{#if descFull}}checked{{/if}}>
+          Full entry text
+        </label>
+        <label class="dtm-ts-radio-row">
+          <input type="radio" name="descCapture" value="none" data-field="descCapture" {{#if descNone}}checked{{/if}}>
+          None
+        </label>
+        <label class="dtm-ts-radio-row">
+          <input type="radio" name="descCapture" value="regex" data-field="descCapture" {{#if descRegex}}checked{{/if}}>
+          Custom regex
+        </label>
+        {{#if descRegex}}
+        <div class="dtm-ts-sub-row">
+          <label>Pattern</label>
+          <input type="text" data-field="descPattern" value="{{descPattern}}" placeholder="e.g. :\s*(.+)" class="dtm-ts-input" />
+          <label>Group</label>
+          <input type="number" data-field="descGroup" value="{{descGroup}}" min="0" class="dtm-ts-num-input" />
+        </div>
+        {{/if}}
+      </div>
+
+      <div class="dtm-ts-rule-section">
+        <div class="dtm-ts-rule-heading">Strip Patterns</div>
+        <div class="dtm-ts-hint">Comma-separated regex patterns to remove from name and description.</div>
+        <input type="text" data-field="stripPatterns" value="{{stripPatterns}}" placeholder="e.g. \*,†" class="dtm-ts-input dtm-ts-full-width" />
+      </div>
+
+    </div>{{!-- /.dtm-ts-rules-pane --}}
+
+  </div>{{!-- /.dtm-ts-dialog-container --}}
+
+  {{!-- Preview: fixed-height strip below the top panes --}}
+  <div class="dtm-ts-preview-section">
+    <div class="dtm-ts-pane-label">Preview</div>
+    <div class="dtm-ts-preview">
+      {{{previewHtml}}}
+    </div>
+  </div>
+
+  {{!-- Footer: always anchored at the bottom, never scrolls away --}}
+  <div class="dtm-ts-dialog-footer">
+    <div class="dtm-ts-dialog-buttons">
+      <button type="button" data-action="apply" class="dtm-btn-primary">
+        <i class="fas fa-check"></i> Apply (<span class="dtm-ts-entry-count">{{entryCount}} entries</span>)
+      </button>
+      <button type="button" data-action="cancel" class="dtm-btn-secondary">
+        <i class="fas fa-times"></i> Cancel
+      </button>
+    </div>
+  </div>
+
+</div>{{!-- /.dtm-ts-dialog-shell --}}

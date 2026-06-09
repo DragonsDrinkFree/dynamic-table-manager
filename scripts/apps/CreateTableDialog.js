@@ -5,6 +5,8 @@ import { PDFScannerWindow } from "./PDFScannerWindow.js";
 import { PasteTableParser } from "../lib/PasteTableParser.js";
 import { TableCreator } from "../lib/TableCreator.js";
 import { ItemTemplateRoller } from "../lib/ItemTemplateRoller.js";
+import { AdvancedTableEditorWindow } from "./AdvancedTableEditorWindow.js";
+import { AdvancedTableRoller } from "../lib/AdvancedTableRoller.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -65,7 +67,8 @@ export class CreateTableDialog extends HandlebarsApplicationMixin(ApplicationV2)
       tableTypes: [
         { value: "basic",            label: "Basic Table" },
         { value: "journal-template", label: "Journal Template" },
-        { value: "item-template",    label: "Item Template" }
+        { value: "item-template",    label: "Item Template" },
+        { value: "advanced-table",   label: "Advanced Table" }
       ],
       isJournalTemplate: this.#tableType === "journal-template",
       isItemTemplate: this.#tableType === "item-template",
@@ -161,6 +164,20 @@ export class CreateTableDialog extends HandlebarsApplicationMixin(ApplicationV2)
     const form = this.element.querySelector("form");
     const name = form.querySelector("[name='name']")?.value.trim()
                || CreateTableDialog.#getDefaultTableName();
+
+    if (this.#tableType === "advanced-table") {
+      const table = await RollTable.create({
+        name,
+        formula: "1",
+        replacement: true,
+        folder: this.#folderId,
+        flags: { "dynamic-table-manager": { tableType: "advanced-table" } }
+      });
+      await AdvancedTableRoller.ensureDummyResult(table);
+      AdvancedTableEditorWindow.openForTable(table);
+      this.close();
+      return;
+    }
 
     if (this.#tableType === "item-template") {
       const table = await RollTable.create({

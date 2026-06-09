@@ -1,5 +1,7 @@
 import { TableCreator } from "../lib/TableCreator.js";
 import { PDFTableExtractor } from "../lib/PDFTableExtractor.js";
+import { TextScanParser } from "../lib/TextScanParser.js";
+import { TextScanRuleDialog } from "./TextScanRuleDialog.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -28,6 +30,22 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
   // ---- Region list ----
   #regions       = [];     // RegionRecord[]
   #activeRegionId = null;
+
+  // ---- Text scan groups ----
+  #textScanGroups    = [];   // TextScanGroup[]
+  #activeTextGroupId = null; // id of group that receives new text-scan regions
+
+  // ---- Multi-page scan groups ----
+  #toolboxOpen            = null; // "single" | "multi" | null — which sub-toolbar is open
+  #multiPageGroups        = [];   // MultiPageGroup[]  { id, name, mode, regionIds }
+  #activeMultiPageGroupId = null; // id of group that receives new multi-page regions
+
+  // ---- Slice scan groups ----
+  #sliceGroups        = [];   // SliceGroup[]  { id, name, mode, regionIds }
+  #activeSliceGroupId = null; // id of group that receives new slice regions
+
+  // ---- Group collapse state (all group types share one Set; groups expanded by default) ----
+  #collapsedGroups = new Set();
 
   // ---- Group state ----
   // A "family" is an invisible container holding a shared roleTemplate and a list of "instances".
@@ -58,25 +76,41 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     classes: ["dynamic-table-manager", "dtm-pdf-scanner"],
     tag: "div",
     window: { title: "Scan PDF", icon: "fas fa-file-pdf", resizable: true },
-    position: { width: 940, height: 660 },
+    position: { width: 1010, height: 660 },
     actions: {
-      selectPdf:            PDFScannerWindow.#onSelectPdf,
-      selectSingle:         PDFScannerWindow.#onSelectSingle,
-      selectMulti:          PDFScannerWindow.#onSelectMulti,
-      prevPage:             PDFScannerWindow.#onPrevPage,
-      nextPage:             PDFScannerWindow.#onNextPage,
-      deleteRegion:         PDFScannerWindow.#onDeleteRegion,
-      previewRegion:        PDFScannerWindow.#onPreviewRegion,
-      createTables:         PDFScannerWindow.#onCreateTables,
-      exportRecipe:         PDFScannerWindow.#onExportRecipe,
-      importRecipe:         PDFScannerWindow.#onImportRecipe,
-      addPrefixGroup:       PDFScannerWindow.#onAddPrefixGroup,
-      newGroupInstance:     PDFScannerWindow.#onNewGroupInstance,
-      activateInstance:     PDFScannerWindow.#onActivateInstance,
-      toggleInstanceExpand: PDFScannerWindow.#onToggleInstanceExpand,
-      deleteInstance:       PDFScannerWindow.#onDeleteInstance,
-      activateUngrouped:    PDFScannerWindow.#onActivateUngrouped,
-      cancel:               PDFScannerWindow.#onCancel
+      selectPdf:             PDFScannerWindow.#onSelectPdf,
+      selectSingleToolbox:   PDFScannerWindow.#onSelectSingleToolbox,
+      selectMultiToolbox:    PDFScannerWindow.#onSelectMultiToolbox,
+      selectSinglePage:      PDFScannerWindow.#onSelectSinglePage,
+      selectMultiPage:       PDFScannerWindow.#onSelectMultiPage,
+      prevPage:              PDFScannerWindow.#onPrevPage,
+      nextPage:              PDFScannerWindow.#onNextPage,
+      deleteRegion:          PDFScannerWindow.#onDeleteRegion,
+      previewRegion:         PDFScannerWindow.#onPreviewRegion,
+      createTables:          PDFScannerWindow.#onCreateTables,
+      exportRecipe:          PDFScannerWindow.#onExportRecipe,
+      importRecipe:          PDFScannerWindow.#onImportRecipe,
+      addPrefixGroup:        PDFScannerWindow.#onAddPrefixGroup,
+      newGroupInstance:      PDFScannerWindow.#onNewGroupInstance,
+      activateInstance:      PDFScannerWindow.#onActivateInstance,
+      toggleInstanceExpand:  PDFScannerWindow.#onToggleInstanceExpand,
+      deleteInstance:        PDFScannerWindow.#onDeleteInstance,
+      activateUngrouped:     PDFScannerWindow.#onActivateUngrouped,
+      selectTextScan:        PDFScannerWindow.#onSelectTextScan,
+      newTextScanGroup:      PDFScannerWindow.#onNewTextScanGroup,
+      activateTextGroup:     PDFScannerWindow.#onActivateTextGroup,
+      editGroupRules:        PDFScannerWindow.#onEditGroupRules,
+      deleteTextScanGroup:   PDFScannerWindow.#onDeleteTextScanGroup,
+      removeTextRegion:      PDFScannerWindow.#onRemoveTextRegion,
+      activateMpGroup:       PDFScannerWindow.#onActivateMpGroup,
+      deleteMpGroup:         PDFScannerWindow.#onDeleteMpGroup,
+      removeMpRegion:        PDFScannerWindow.#onRemoveMpRegion,
+      selectSlice:           PDFScannerWindow.#onSelectSlice,
+      activateSliceGroup:    PDFScannerWindow.#onActivateSliceGroup,
+      deleteSliceGroup:      PDFScannerWindow.#onDeleteSliceGroup,
+      removeSliceRegion:     PDFScannerWindow.#onRemoveSliceRegion,
+      toggleGroupExpand:     PDFScannerWindow.#onToggleGroupExpand,
+      cancel:                PDFScannerWindow.#onCancel
     }
   };
 
@@ -119,8 +153,88 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       }
     }
     const ungroupedRegions = this.#regions
-      .filter(r => !r.instanceId)
+      .filter(r => !r.instanceId && !r.textGroupId && !r.multiPageGroupId && !r.sliceGroupId)
       .map(regionView);
+
+    // Text scan groups for context
+    const textScanGroups = this.#textScanGroups.map(g => {
+      const groupRegions = this.#regions
+        .filter(r => r.textGroupId === g.id)
+        .map(r => ({ id: r.id, page: r.page, name: r.name }));
+      return {
+        id:          g.id,
+        name:        g.name,
+        isActive:    this.#activeTextGroupId === g.id,
+        isExpanded:  !this.#collapsedGroups.has(g.id),
+        entryCount:  g.parsed?.entries.length ?? 0,
+        hasParsed:   !!g.parsed,
+        regions:     groupRegions
+      };
+    });
+
+    // Multi-page scan groups
+    const multiPageGroups = this.#multiPageGroups.map(g => {
+      const groupRegions = g.regionIds
+        .map(id => this.#regions.find(r => r.id === id))
+        .filter(Boolean);
+      const totalEntryCount = groupRegions.reduce((sum, r) => {
+        if (!r.parsed) return sum;
+        return sum + (r.parsed.isMultiColumn
+          ? (r.parsed.columns?.[0]?.entries?.length ?? 0)
+          : (r.parsed.entries?.length ?? 0));
+      }, 0);
+      return {
+        id: g.id, name: g.name, mode: g.mode,
+        isActive: g.id === this.#activeMultiPageGroupId,
+        isExpanded: !this.#collapsedGroups.has(g.id),
+        totalEntryCount,
+        regions: groupRegions.map(r => ({
+          id: r.id, page: r.page,
+          name: r.customName ?? r.name,
+          entryCount: r.parsed
+            ? (r.parsed.isMultiColumn
+              ? (r.parsed.columns?.[0]?.entries?.length ?? 0)
+              : (r.parsed.entries?.length ?? 0))
+            : 0
+        }))
+      };
+    });
+
+    // Slice scan groups
+    const sliceGroups = this.#sliceGroups.map(g => {
+      const groupRegions = g.regionIds
+        .map(id => this.#regions.find(r => r.id === id))
+        .filter(Boolean)
+        .map(r => {
+          const isImported = Array.isArray(r.parsed?.entries);
+          if (isImported) {
+            const ents = r.parsed.entries;
+            const low  = ents[0]?.low  ?? null;
+            const high = ents[ents.length - 1]?.high ?? null;
+            const rangeDisplay = (low != null && high != null)
+              ? (low === high ? `${low}` : `${low}-${high}`) : null;
+            return { id: r.id, page: r.page, isImported: true,
+                     rangeDisplay, entryCount: ents.length,
+                     namePreview: r.name, hasRange: rangeDisplay != null };
+          }
+          const low = r.parsed?.low ?? null;
+          const high = r.parsed?.high ?? null;
+          const rangeDisplay = low != null
+            ? (low === high ? `${low}` : `${low}-${high}`) : null;
+          return { id: r.id, page: r.page, isImported: false,
+                   rangeDisplay, entryCount: null,
+                   namePreview: (r.parsed?.name ?? "").slice(0, 40),
+                   hasRange: low != null };
+        });
+      return { id: g.id, name: g.name, isActive: g.id === this.#activeSliceGroupId,
+               isExpanded: !this.#collapsedGroups.has(g.id),
+               regions: groupRegions, regionCount: groupRegions.length };
+    });
+
+    const hasNormalContent = this.#regions.filter(r => !r.textGroupId && !r.multiPageGroupId && !r.sliceGroupId).length > 0;
+    const hasMpContent     = this.#multiPageGroups.length > 0;
+    const hasTsContent     = this.#textScanGroups.length > 0;
+    const hasSliceContent  = this.#sliceGroups.length > 0;
 
     return {
       hasPdf:      !!this.#pdfDoc,
@@ -128,28 +242,42 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       totalPages:  this.#totalPages,
       isFirstPage: this.#currentPage <= 1,
       isLastPage:  this.#currentPage >= this.#totalPages,
-      selectMode:     this.#selectMode,
-      isSelectSingle: this.#selectMode === "single",
-      isSelectMulti:  this.#selectMode === "multi",
+      selectMode:        this.#selectMode,
+      toolboxOpen:       this.#toolboxOpen,
+      isSelectSingleToolbox: this.#toolboxOpen === "single",
+      isSelectMultiToolbox:  this.#toolboxOpen === "multi",
+      isSelectSinglePage: this.#selectMode === "single",
+      isSelectMultiPage:  this.#selectMode === "single-mp" || this.#selectMode === "multi-mp",
+      isSelectTextScan:  this.#selectMode === "text-scan",
+      isSelectSlice:     this.#selectMode === "slice",
       hasFamilies:     this.#families.length > 0,
       instances,
       ungroupedRegions,
       isUngroupedActive: this.#activeInstanceId === null,
-      totalRegionCount:  this.#regions.length,
-      activeRegion: activeRegion ? {
-        id:            activeRegion.id,
-        name:          this.#resolveRoleName(activeRegion),
-        isMultiColumn: activeRegion.parsed?.isMultiColumn ?? false,
-        columns:       activeRegion.parsed?.isMultiColumn
-          ? activeRegion.parsed.columns.map(c => ({
-              header:  c.header,
-              entries: c.entries
-            }))
-          : null,
-        entries: !activeRegion.parsed?.isMultiColumn
-          ? (activeRegion.parsed?.entries ?? [])
-          : null
-      } : null,
+      totalRegionCount:  this.#regions.filter(r => !r.textGroupId && !r.multiPageGroupId && !r.sliceGroupId).length,
+      hasRegions:    hasNormalContent || hasTsContent || hasMpContent || hasSliceContent,
+      hasAnyContent: hasNormalContent || hasTsContent || hasMpContent || hasSliceContent,
+      textScanGroups,
+      hasTextScanGroups: hasTsContent,
+      multiPageGroups,
+      hasMpGroups: hasMpContent,
+      sliceGroups,
+      activeRegion: activeRegion ? (() => {
+        const isSlice = !!activeRegion.sliceGroupId;
+        return {
+          id:            activeRegion.id,
+          name:          this.#resolveRoleName(activeRegion),
+          isMultiColumn: !isSlice && (activeRegion.parsed?.isMultiColumn ?? false),
+          columns:       !isSlice && activeRegion.parsed?.isMultiColumn
+            ? activeRegion.parsed.columns.map(c => ({ header: c.header, entries: c.entries }))
+            : null,
+          entries: isSlice
+            ? (activeRegion.parsed?.name
+                ? [{ low: activeRegion.parsed.low ?? "?", high: activeRegion.parsed.high ?? "?", name: activeRegion.parsed.name }]
+                : [])
+            : (!activeRegion.parsed?.isMultiColumn ? (activeRegion.parsed?.entries ?? []) : null)
+        };
+      })() : null,
       hasRegions:    this.#regions.length > 0,
       usePrefix:     this.#usePrefix,
       tablePrefix:   this.#tablePrefix,
@@ -163,6 +291,7 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     this.#attachCanvasListeners();
     this.#attachRegionListeners();
     this.#attachFooterListeners();
+    this.#syncToolbar();
 
     // Page jump input
     const pageInput = this.element.querySelector(".dtm-page-input");
@@ -244,16 +373,31 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
     // Confirmed regions for current page
     for (const region of this.#regions.filter(r => r.page === this.#currentPage)) {
       const cr = this.#pdfRectToCanvas(region.rect, this.#currentViewport, dpr);
-      const isActive = region.id === this.#activeRegionId;
-      ctx.fillStyle   = isActive ? "rgba(100, 160, 255, 0.15)" : "rgba(100, 200, 100, 0.12)";
-      ctx.strokeStyle = isActive ? "rgba(100, 160, 255, 0.9)"  : "rgba(100, 200, 100, 0.8)";
+      const isActive    = region.id === this.#activeRegionId;
+      const isTextScan  = region.mode === "text-scan";
+      const isMpScan    = !!region.multiPageGroupId;
+      const isSliceScan = !!region.sliceGroupId;
+      ctx.fillStyle   = isActive    ? "rgba(100, 160, 255, 0.15)"
+                      : isTextScan  ? "rgba(220, 160, 60, 0.12)"
+                      : isMpScan    ? "rgba(160, 100, 220, 0.12)"
+                      : isSliceScan ? "rgba(40, 180, 160, 0.12)"
+                      : "rgba(100, 200, 100, 0.12)";
+      ctx.strokeStyle = isActive    ? "rgba(100, 160, 255, 0.9)"
+                      : isTextScan  ? "rgba(220, 160, 60, 0.85)"
+                      : isMpScan    ? "rgba(160, 100, 220, 0.85)"
+                      : isSliceScan ? "rgba(40, 180, 160, 0.85)"
+                      : "rgba(100, 200, 100, 0.8)";
       ctx.lineWidth   = 2;
       ctx.setLineDash([]);
       ctx.fillRect(cr.x, cr.y, cr.w, cr.h);
       ctx.strokeRect(cr.x, cr.y, cr.w, cr.h);
 
       // Label
-      ctx.fillStyle = isActive ? "rgba(100, 160, 255, 0.9)" : "rgba(100, 200, 100, 0.9)";
+      ctx.fillStyle = isActive    ? "rgba(100, 160, 255, 0.9)"
+                    : isTextScan  ? "rgba(220, 160, 60, 0.9)"
+                    : isMpScan    ? "rgba(160, 100, 220, 0.9)"
+                    : isSliceScan ? "rgba(40, 180, 160, 0.9)"
+                    : "rgba(100, 200, 100, 0.9)";
       ctx.font = `${11 * dpr}px sans-serif`;
       ctx.fillText(region.name, cr.x + 4 * dpr, cr.y + 13 * dpr);
     }
@@ -349,12 +493,79 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
         await this.#onRegionNameChange(ev.target);
       } else if (ev.target.classList.contains("dtm-instance-name")) {
         this.#onInstanceNameChange(ev.target);
+      } else if (ev.target.classList.contains("dtm-ts-group-name-input")) {
+        this.#onTextGroupNameChange(ev.target);
+      } else if (ev.target.classList.contains("dtm-mp-group-name-input")) {
+        this.#onMpGroupNameChange(ev.target);
+      } else if (ev.target.classList.contains("dtm-slice-group-name-input")) {
+        this.#onSliceGroupNameChange(ev.target);
       }
     });
-    // Prevent activate action from firing when user clicks the instance name input
+    // Prevent activate actions from firing when user clicks name inputs
     list.addEventListener("click", (ev) => {
       if (ev.target.classList.contains("dtm-instance-name")) ev.stopPropagation();
+      if (ev.target.classList.contains("dtm-ts-group-name-input")) ev.stopPropagation();
+      if (ev.target.classList.contains("dtm-mp-group-name-input")) ev.stopPropagation();
+      if (ev.target.classList.contains("dtm-slice-group-name-input")) ev.stopPropagation();
     });
+
+    // Drag ungrouped region items into slice groups
+    list.addEventListener("dragstart", (ev) => {
+      const item = ev.target.closest(".dtm-region-item[data-region-id]");
+      if (!item) { ev.preventDefault(); return; }
+      ev.dataTransfer.setData("text/plain", item.dataset.regionId);
+      ev.dataTransfer.effectAllowed = "move";
+    });
+
+    list.addEventListener("dragover", (ev) => {
+      const groupEl = ev.target.closest("[data-slice-group-id]");
+      if (!groupEl) return;
+      if (!ev.dataTransfer.types.includes("text/plain")) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "move";
+      groupEl.classList.add("dtm-drag-over");
+    });
+
+    list.addEventListener("dragleave", (ev) => {
+      const groupEl = ev.target.closest("[data-slice-group-id]");
+      if (!groupEl || groupEl.contains(ev.relatedTarget)) return;
+      groupEl.classList.remove("dtm-drag-over");
+    });
+
+    list.addEventListener("drop", (ev) => {
+      const groupEl = ev.target.closest("[data-slice-group-id]");
+      if (!groupEl) return;
+      ev.preventDefault();
+      groupEl.classList.remove("dtm-drag-over");
+      const regionId = ev.dataTransfer.getData("text/plain");
+      this.#onDropRegionIntoSliceGroup(regionId, groupEl.dataset.sliceGroupId);
+    });
+  }
+
+  #onDropRegionIntoSliceGroup(regionId, groupId) {
+    if (!regionId || !groupId) return;
+    const region = this.#regions.find(r => r.id === regionId);
+    const group  = this.#sliceGroups.find(g => g.id === groupId);
+    if (!region || !group) return;
+    if (region.instanceId || region.textGroupId || region.multiPageGroupId || region.sliceGroupId) return;
+    if (region.parsed?.isMultiColumn) {
+      ui.notifications.warn("Multi-column regions cannot be added to a slice group.");
+      return;
+    }
+    if (!region.parsed?.entries?.length) return;
+    region.sliceGroupId = groupId;
+    group.regionIds.push(regionId);
+    this.render();
+  }
+
+  #onTextGroupNameChange(input) {
+    const id = input.dataset.textGroupId;
+    if (!id) return;
+    const group = this.#textScanGroups.find(g => g.id === id);
+    if (!group) return;
+    const newName = input.value.trim();
+    if (!newName) { input.value = group.name; return; }
+    group.name = newName;
   }
 
   async #onRegionNameChange(input) {
@@ -441,9 +652,83 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
     const dpr     = window.devicePixelRatio || 1;
     const pdfRect = canvasRectToPdf(canvasRect, this.#currentViewport, dpr);
-    const mode    = this.#selectMode === "single" ? "single" : "multi";
 
-    const parsed  = await this.#extractForRegion(this.#currentPage, pdfRect, mode);
+    // ---- Text scan mode: store raw items, route to a scan group ----
+    if (this.#selectMode === "text-scan") {
+      const rawItems = await this.#extractRawItemsForRegion(this.#currentPage, pdfRect);
+      const id = crypto.randomUUID();
+
+      // Auto-create a group if there isn't an active one.
+      let groupId = this.#activeTextGroupId;
+      if (!groupId || !this.#textScanGroups.find(g => g.id === groupId)) {
+        const newGroup = this.#makeTextScanGroup(`Text Scan ${this.#textScanGroups.length + 1}`);
+        this.#textScanGroups.push(newGroup);
+        groupId = newGroup.id;
+        this.#activeTextGroupId = groupId;
+      }
+
+      const regionCount = this.#regions.filter(r => r.textGroupId === groupId).length;
+      const name = `Region ${regionCount + 1} (p.${this.#currentPage})`;
+
+      this.#regions.push({
+        id, page: this.#currentPage, rect: pdfRect,
+        name, mode: "text-scan", parsed: null,
+        instanceId: null, slotIndex: null, customName: null,
+        rawItems, textGroupId: groupId
+      });
+
+      this.render();
+      return;
+    }
+
+    // ---- Multi-page scan mode ----
+    if (this.#selectMode === "single-mp" || this.#selectMode === "multi-mp") {
+      const baseMode = this.#selectMode === "single-mp" ? "single" : "multi";
+      const parsed   = await this.#extractForRegion(this.#currentPage, pdfRect, baseMode);
+      const id       = crypto.randomUUID();
+      const name     = `Page ${this.#currentPage}`;
+
+      this.#regions.push({
+        id, page: this.#currentPage, rect: pdfRect,
+        name, mode: baseMode, parsed,
+        instanceId: null, slotIndex: null, customName: null,
+        rawItems: null, textGroupId: null,
+        multiPageGroupId: this.#activeMultiPageGroupId
+      });
+
+      const grp = this.#multiPageGroups.find(g => g.id === this.#activeMultiPageGroupId);
+      grp?.regionIds.push(id);
+      this.#activeRegionId = id;
+      this.render();
+      return;
+    }
+
+    // ---- Slice mode: per-box single-entry extraction ----
+    if (this.#selectMode === "slice") {
+      const page    = await this.#pdfDoc.getPage(this.#currentPage);
+      const content = await page.getTextContent();
+      const parsed  = PDFTableExtractor.extractSlice(content.items, pdfRect);
+      const id      = crypto.randomUUID();
+      const name    = `p.${this.#currentPage}`;
+
+      this.#regions.push({
+        id, page: this.#currentPage, rect: pdfRect,
+        name, mode: "single", parsed,
+        instanceId: null, slotIndex: null, customName: null,
+        rawItems: null, textGroupId: null,
+        multiPageGroupId: null, sliceGroupId: this.#activeSliceGroupId
+      });
+
+      const grp = this.#sliceGroups.find(g => g.id === this.#activeSliceGroupId);
+      grp?.regionIds.push(id);
+      this.#activeRegionId = id;
+      this.render();
+      return;
+    }
+
+    // ---- Normal single / multi col mode ----
+    const mode   = this.#selectMode === "single" ? "single" : "multi";
+    const parsed = await this.#extractForRegion(this.#currentPage, pdfRect, mode);
 
     const id = crypto.randomUUID();
 
@@ -467,11 +752,27 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
 
     this.#regions.push({
       id, page: this.#currentPage, rect: pdfRect, name, mode, parsed,
-      instanceId, slotIndex, customName: null
+      instanceId, slotIndex, customName: null,
+      rawItems: null, textGroupId: null
     });
 
     this.#activeRegionId = id;
     this.render();
+  }
+
+  async #extractRawItemsForRegion(pageNum, pdfRect) {
+    const page    = await this.#pdfDoc.getPage(pageNum);
+    const content = await page.getTextContent();
+    return TextScanParser.filterItemsToRect(content.items, pdfRect);
+  }
+
+  #makeTextScanGroup(name) {
+    return {
+      id:      crypto.randomUUID(),
+      name,
+      rules:   TextScanParser.defaultRules(),
+      parsed:  null
+    };
   }
 
   async #extractForRegion(pageNum, pdfRect, mode = "multi") {
@@ -587,28 +888,124 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       this.#families = [];
       this.#activeInstanceId = null;
       this.#expandedInstances = new Set();
+      this.#textScanGroups = [];
+      this.#activeTextGroupId = null;
+      this.#multiPageGroups = [];
+      this.#activeMultiPageGroupId = null;
+      this.#sliceGroups = [];
+      this.#activeSliceGroupId = null;
+      this.#collapsedGroups = new Set();
+      this.#toolboxOpen = null;
       await this.render();
     };
     input.click();
   }
 
-  static #onSelectSingle() {
-    this.#selectMode = this.#selectMode === "single" ? null : "single";
+  static #onSelectSingleToolbox() {
+    if (this.#toolboxOpen === "single") {
+      this.#toolboxOpen = null;
+      this.#selectMode  = null;
+    } else {
+      this.#toolboxOpen = "single";
+      if (this.#selectMode === "multi" || this.#selectMode === "multi-mp") this.#selectMode = null;
+    }
     this.#currentRect = null;
-    this.#syncSelectButtons();
+    this.#syncToolbar();
   }
 
-  static #onSelectMulti() {
-    this.#selectMode = this.#selectMode === "multi" ? null : "multi";
+  static #onSelectMultiToolbox() {
+    if (this.#toolboxOpen === "multi") {
+      this.#toolboxOpen = null;
+      this.#selectMode  = null;
+    } else {
+      this.#toolboxOpen = "multi";
+      if (this.#selectMode === "single" || this.#selectMode === "single-mp") this.#selectMode = null;
+    }
     this.#currentRect = null;
-    this.#syncSelectButtons();
+    this.#syncToolbar();
   }
 
-  #syncSelectButtons() {
-    const single = this.element.querySelector("[data-action='selectSingle']");
-    const multi  = this.element.querySelector("[data-action='selectMulti']");
-    single?.classList.toggle("dtm-active", this.#selectMode === "single");
-    multi?.classList.toggle("dtm-active", this.#selectMode === "multi");
+  static #onSelectSinglePage() {
+    if (!this.#toolboxOpen) return;
+    const baseMode = this.#toolboxOpen; // "single" or "multi"
+    this.#selectMode = this.#selectMode === baseMode ? null : baseMode;
+    this.#currentRect = null;
+    this.#syncToolbar();
+  }
+
+  static #onSelectMultiPage() {
+    if (!this.#toolboxOpen) return;
+    const baseMode = this.#toolboxOpen;
+    const mpMode   = `${baseMode}-mp`;
+    if (this.#selectMode === mpMode) {
+      this.#selectMode = null;
+    } else {
+      this.#selectMode = mpMode;
+      // Create a new group if there is no active group or the active group already has regions.
+      const activeGroup = this.#multiPageGroups.find(g => g.id === this.#activeMultiPageGroupId);
+      if (!activeGroup || activeGroup.regionIds.length > 0) {
+        const newGroup = {
+          id:        crypto.randomUUID(),
+          name:      `Scan Group ${this.#multiPageGroups.length + 1}`,
+          mode:      baseMode,
+          regionIds: []
+        };
+        this.#multiPageGroups.push(newGroup);
+        this.#activeMultiPageGroupId = newGroup.id;
+      } else {
+        activeGroup.mode = baseMode;
+      }
+    }
+    this.#currentRect = null;
+    this.#syncToolbar();
+    this.render();
+  }
+
+  static #onSelectSlice() {
+    if (!this.#toolboxOpen) return;
+    if (this.#selectMode === "slice") {
+      this.#selectMode = null;
+    } else {
+      this.#selectMode = "slice";
+      const activeGroup = this.#sliceGroups.find(g => g.id === this.#activeSliceGroupId);
+      if (!activeGroup || activeGroup.regionIds.length > 0) {
+        const newGroup = {
+          id:        crypto.randomUUID(),
+          name:      `Slice Group ${this.#sliceGroups.length + 1}`,
+          mode:      this.#toolboxOpen,
+          regionIds: []
+        };
+        this.#sliceGroups.push(newGroup);
+        this.#activeSliceGroupId = newGroup.id;
+      }
+    }
+    this.#currentRect = null;
+    this.#syncToolbar();
+    this.render();
+  }
+
+  #syncToolbar() {
+    const singleBtn = this.element.querySelector("[data-action='selectSingleToolbox']");
+    const multiBtn  = this.element.querySelector("[data-action='selectMultiToolbox']");
+    const textBtn   = this.element.querySelector("[data-action='selectTextScan']");
+    singleBtn?.classList.toggle("dtm-active", this.#toolboxOpen === "single");
+    multiBtn?.classList.toggle("dtm-active",  this.#toolboxOpen === "multi");
+    textBtn?.classList.toggle("dtm-active",   this.#selectMode === "text-scan");
+
+    // Sub-toolbar visibility
+    const subtoolbar = this.element.querySelector(".dtm-subtoolbar");
+    if (subtoolbar) subtoolbar.hidden = !this.#toolboxOpen;
+
+    // Sub-tool button active states
+    const spBtn    = this.element.querySelector("[data-action='selectSinglePage']");
+    const mpBtn    = this.element.querySelector("[data-action='selectMultiPage']");
+    const sliceBtn = this.element.querySelector("[data-action='selectSlice']");
+    const base  = this.#toolboxOpen;
+    spBtn?.classList.toggle("dtm-active", this.#selectMode === base);
+    mpBtn?.classList.toggle("dtm-active", this.#selectMode === `${base}-mp`);
+    sliceBtn?.classList.toggle("dtm-active", this.#selectMode === "slice");
+
+    // Cursor
     const overlay = this.element.querySelector("#dtm-select-canvas");
     if (overlay) overlay.style.cursor = this.#selectMode ? "crosshair" : "default";
   }
@@ -707,14 +1104,32 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   static async #onCreateTables() {
-    const withData = this.#regions.filter(r => r.parsed &&
+    const normalRegions = this.#regions.filter(r => !r.textGroupId && !r.multiPageGroupId && !r.sliceGroupId);
+    const withData = normalRegions.filter(r => r.parsed &&
       (r.parsed.isMultiColumn ? r.parsed.columns[0].entries.length > 0 : r.parsed.entries.length > 0)
     );
-    if (withData.length === 0) {
-      ui.notifications.warn("No regions contain extractable table data.");
+    const groupsWithData = this.#textScanGroups.filter(g => g.parsed?.entries?.length > 0);
+    const mpGroupsWithData = this.#multiPageGroups.filter(g =>
+      g.regionIds.some(id => {
+        const r = this.#regions.find(r => r.id === id);
+        if (!r?.parsed) return false;
+        return r.parsed.isMultiColumn
+          ? (r.parsed.columns?.[0]?.entries?.length ?? 0) > 0
+          : (r.parsed.entries?.length ?? 0) > 0;
+      })
+    );
+
+    const sliceGroupsHaveData = this.#sliceGroups.some(g =>
+      g.regionIds.some(id => {
+        const r = this.#regions.find(r => r.id === id);
+        return r?.parsed?.name?.trim();
+      })
+    );
+    if (withData.length === 0 && groupsWithData.length === 0 && mpGroupsWithData.length === 0 && !sliceGroupsHaveData) {
+      ui.notifications.warn("No regions or scan groups contain extractable table data.");
       return;
     }
-    const skipped = this.#regions.length - withData.length;
+    const skipped = normalRegions.length - withData.length;
     if (skipped > 0) ui.notifications.warn(`${skipped} region(s) had no data and were skipped.`);
 
     const makeCompound = this.#makeCompound;
@@ -742,6 +1157,77 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       } else {
         allTables.push(await TableCreator.createSingleTable(tableName, region.parsed, folderId));
       }
+    }
+
+    // Create tables from text scan groups.
+    const skippedGroups = this.#textScanGroups.length - groupsWithData.length;
+    if (skippedGroups > 0 && this.#textScanGroups.length > 0) {
+      ui.notifications.warn(`${skippedGroups} text scan group(s) have no parsed data — use Edit Rules first.`);
+    }
+    for (const group of groupsWithData) {
+      const tableName = (this.#usePrefix && this.#tablePrefix.trim())
+        ? `${this.#tablePrefix.trim()} ${group.name}`
+        : group.name;
+      allTables.push(await TableCreator.createSingleTable(tableName, group.parsed, this.#folderId));
+    }
+
+    // Create tables from multi-page scan groups.
+    for (const group of mpGroupsWithData) {
+      const parsedArray = group.regionIds
+        .map(id => this.#regions.find(r => r.id === id)?.parsed)
+        .filter(Boolean);
+      const merged = PDFTableExtractor.mergeResults(parsedArray);
+      if (!merged) continue;
+      const tableName = (this.#usePrefix && this.#tablePrefix.trim())
+        ? `${this.#tablePrefix.trim()} ${group.name}`
+        : group.name;
+      if (merged.isMultiColumn) {
+        const tables = await TableCreator.createSplitTables(tableName, merged, this.#folderId, makeCompound);
+        allTables.push(...tables);
+      } else {
+        allTables.push(await TableCreator.createSingleTable(tableName, merged, this.#folderId));
+      }
+    }
+
+    // Create tables from slice groups.
+    for (const group of this.#sliceGroups) {
+      const rawEntries = [];
+
+      for (const id of group.regionIds) {
+        const r = this.#regions.find(r => r.id === id);
+        if (!r?.parsed) continue;
+        if (Array.isArray(r.parsed.entries)) {
+          rawEntries.push(...r.parsed.entries.map(e => ({ low: e.low, high: e.high, name: e.name })));
+        } else if (r.parsed.name?.trim()) {
+          rawEntries.push({ low: r.parsed.low ?? null, high: r.parsed.high ?? null, name: r.parsed.name });
+        }
+      }
+
+      if (!rawEntries.length) continue;
+
+      // Sort known-low entries by value, null-low entries at end
+      rawEntries.sort((a, b) => {
+        if (a.low == null && b.low == null) return 0;
+        if (a.low == null) return 1;
+        if (b.low == null) return -1;
+        return a.low - b.low;
+      });
+
+      // Auto-number null-low entries from max known high + 1
+      const knownHighs = rawEntries.filter(e => e.low != null).map(e => e.high);
+      let autoIndex = knownHighs.length > 0 ? Math.max(...knownHighs) + 1 : 1;
+      for (const e of rawEntries) {
+        if (e.low == null) { e.low = autoIndex; e.high = autoIndex; }
+        autoIndex = e.high + 1;
+      }
+
+      const maxHigh = Math.max(...rawEntries.map(e => e.high));
+      const formula = maxHigh > 0 ? `1d${maxHigh}` : `1d${rawEntries.length}`;
+      const merged  = { isMultiColumn: false, entries: rawEntries, formula };
+      const tableName = (this.#usePrefix && this.#tablePrefix.trim())
+        ? `${this.#tablePrefix.trim()} ${group.name}`
+        : group.name;
+      allTables.push(await TableCreator.createSingleTable(tableName, merged, this.#folderId));
     }
 
     ui.notifications.info(`Created ${allTables.length} table(s) from PDF scan.`);
@@ -1017,6 +1503,247 @@ export class PDFScannerWindow extends HandlebarsApplicationMixin(ApplicationV2) 
       ui.notifications.info(`Imported ${this.#regions.length} region(s)${schema === 2 ? ` into ${newFamilies.reduce((n,f)=>n+f.instances.length,0)} instance(s)` : ""}.`);
     };
     input.click();
+  }
+
+  // ---- Text scan actions ----
+
+  static #onSelectTextScan() {
+    this.#selectMode  = this.#selectMode === "text-scan" ? null : "text-scan";
+    this.#toolboxOpen = null;
+    this.#currentRect = null;
+    this.#syncToolbar();
+  }
+
+  static #onNewTextScanGroup() {
+    const group = this.#makeTextScanGroup(`Text Scan ${this.#textScanGroups.length + 1}`);
+    this.#textScanGroups.push(group);
+    this.#activeTextGroupId = group.id;
+    this.render();
+  }
+
+  static #onActivateTextGroup(event, target) {
+    const id = target.closest("[data-text-group-id]")?.dataset.textGroupId;
+    if (!id) return;
+    this.#activeTextGroupId = this.#activeTextGroupId === id ? null : id;
+    this.render();
+  }
+
+  static #onEditGroupRules(event, target) {
+    event.stopPropagation?.();
+    const id = target.closest("[data-text-group-id]")?.dataset.textGroupId;
+    const group = this.#textScanGroups.find(g => g.id === id);
+    if (!group) return;
+
+    const regionItems = this.#regions
+      .filter(r => r.textGroupId === id)
+      .map(r => r.rawItems ?? []);
+
+    if (!regionItems.some(ri => ri.length > 0)) {
+      ui.notifications.warn("No scanned regions in this group yet. Draw regions first.");
+      return;
+    }
+
+    TextScanRuleDialog.open({
+      group,
+      regionItems,
+      onApply: (updated) => {
+        const idx = this.#textScanGroups.findIndex(g => g.id === updated.id);
+        if (idx !== -1) this.#textScanGroups[idx] = updated;
+        // Deselect after apply — next draw in Text Scan mode will start a fresh group
+        this.#activeTextGroupId = null;
+        this.render();
+      }
+    });
+  }
+
+  static async #onDeleteTextScanGroup(event, target) {
+    event.stopPropagation?.();
+    const id = target.closest("[data-text-group-id]")?.dataset.textGroupId;
+    const group = this.#textScanGroups.find(g => g.id === id);
+    if (!group) return;
+    const regionCount = this.#regions.filter(r => r.textGroupId === id).length;
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "Delete Text Scan Group" },
+      content: `<p>Delete "<strong>${group.name}</strong>" and its <strong>${regionCount}</strong> region(s)?</p>`,
+      rejectClose: false
+    });
+    if (!ok) return;
+    this.#regions = this.#regions.filter(r => r.textGroupId !== id);
+    this.#textScanGroups = this.#textScanGroups.filter(g => g.id !== id);
+    if (this.#activeTextGroupId === id) this.#activeTextGroupId = null;
+    this.#redrawOverlay();
+    this.render();
+  }
+
+  static #onRemoveTextRegion(event, target) {
+    event.stopPropagation?.();
+    const regionId = target.dataset.regionId;
+    if (!regionId) return;
+    this.#regions = this.#regions.filter(r => r.id !== regionId);
+    this.#redrawOverlay();
+    this.render();
+  }
+
+  // ---- Multi-page group actions ----
+
+  #onMpGroupNameChange(input) {
+    const id = input.dataset.mpGroupId;
+    if (!id) return;
+    const group = this.#multiPageGroups.find(g => g.id === id);
+    if (!group) return;
+    const newName = input.value.trim();
+    if (!newName) { input.value = group.name; return; }
+    group.name = newName;
+  }
+
+  #onSliceGroupNameChange(input) {
+    const id = input.dataset.sliceGroupId;
+    if (!id) return;
+    const group = this.#sliceGroups.find(g => g.id === id);
+    if (!group) return;
+    const newName = input.value.trim();
+    if (!newName) { input.value = group.name; return; }
+    group.name = newName;
+  }
+
+  static #onActivateMpGroup(event, target) {
+    const id = target.closest("[data-mp-group-id]")?.dataset.mpGroupId;
+    const group = this.#multiPageGroups.find(g => g.id === id);
+    if (!group) return;
+
+    const alreadyActive = this.#activeMultiPageGroupId === id
+      && (this.#selectMode === "single-mp" || this.#selectMode === "multi-mp");
+
+    if (alreadyActive) {
+      this.#activeMultiPageGroupId = null;
+      this.#selectMode  = null;
+      this.#toolboxOpen = null;
+    } else {
+      this.#activeMultiPageGroupId = id;
+      this.#toolboxOpen = group.mode;
+      this.#selectMode  = `${group.mode}-mp`;
+    }
+    this.#currentRect = null;
+    this.#syncToolbar();
+    this.render();
+  }
+
+  static async #onDeleteMpGroup(event, target) {
+    event.stopPropagation?.();
+    const id = target.closest("[data-mp-group-id]")?.dataset.mpGroupId;
+    const group = this.#multiPageGroups.find(g => g.id === id);
+    if (!group) return;
+    const regionCount = group.regionIds.length;
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "Delete Scan Group" },
+      content: `<p>Delete "<strong>${group.name}</strong>" and its <strong>${regionCount}</strong> region(s)?</p>`,
+      rejectClose: false
+    });
+    if (!ok) return;
+    this.#regions = this.#regions.filter(r => !group.regionIds.includes(r.id));
+    this.#multiPageGroups = this.#multiPageGroups.filter(g => g.id !== id);
+    if (this.#activeMultiPageGroupId === id) {
+      this.#activeMultiPageGroupId = null;
+      if (this.#selectMode === "single-mp" || this.#selectMode === "multi-mp") {
+        this.#selectMode = null;
+      }
+    }
+    if (this.#activeRegionId && !this.#regions.find(r => r.id === this.#activeRegionId)) {
+      this.#activeRegionId = null;
+    }
+    this.#redrawOverlay();
+    this.render();
+  }
+
+  static #onRemoveMpRegion(event, target) {
+    event.stopPropagation?.();
+    const regionId = target.dataset.regionId;
+    if (!regionId) return;
+    const region = this.#regions.find(r => r.id === regionId);
+    if (!region?.multiPageGroupId) return;
+    const group = this.#multiPageGroups.find(g => g.id === region.multiPageGroupId);
+    if (group) group.regionIds = group.regionIds.filter(id => id !== regionId);
+    this.#regions = this.#regions.filter(r => r.id !== regionId);
+    if (this.#activeRegionId === regionId) this.#activeRegionId = null;
+    this.#redrawOverlay();
+    this.render();
+  }
+
+  // ---- Slice group actions ----
+
+  static #onActivateSliceGroup(event, target) {
+    const id = target.closest("[data-slice-group-id]")?.dataset.sliceGroupId;
+    const group = this.#sliceGroups.find(g => g.id === id);
+    if (!group) return;
+
+    const alreadyActive = this.#activeSliceGroupId === id && this.#selectMode === "slice";
+    if (alreadyActive) {
+      this.#activeSliceGroupId = null;
+      this.#selectMode  = null;
+      this.#toolboxOpen = null;
+    } else {
+      this.#activeSliceGroupId = id;
+      this.#toolboxOpen = group.mode ?? "single";
+      this.#selectMode  = "slice";
+    }
+    this.#currentRect = null;
+    this.#syncToolbar();
+    this.render();
+  }
+
+  static async #onDeleteSliceGroup(event, target) {
+    event.stopPropagation?.();
+    const id = target.closest("[data-slice-group-id]")?.dataset.sliceGroupId;
+    const group = this.#sliceGroups.find(g => g.id === id);
+    if (!group) return;
+    const regionCount = group.regionIds.length;
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "Delete Slice Group" },
+      content: `<p>Delete "<strong>${group.name}</strong>" and its <strong>${regionCount}</strong> slice(s)?</p>`,
+      rejectClose: false
+    });
+    if (!ok) return;
+    this.#regions = this.#regions.filter(r => !group.regionIds.includes(r.id));
+    this.#sliceGroups = this.#sliceGroups.filter(g => g.id !== id);
+    if (this.#activeSliceGroupId === id) {
+      this.#activeSliceGroupId = null;
+      if (this.#selectMode === "slice") this.#selectMode = null;
+    }
+    if (this.#activeRegionId && !this.#regions.find(r => r.id === this.#activeRegionId)) {
+      this.#activeRegionId = null;
+    }
+    this.#redrawOverlay();
+    this.render();
+  }
+
+  static #onRemoveSliceRegion(event, target) {
+    event.stopPropagation?.();
+    const regionId = target.dataset.regionId;
+    if (!regionId) return;
+    const region = this.#regions.find(r => r.id === regionId);
+    if (!region?.sliceGroupId) return;
+    const group = this.#sliceGroups.find(g => g.id === region.sliceGroupId);
+    if (Array.isArray(region.parsed?.entries)) {
+      // Imported normal region — unlink only, return to ungrouped
+      region.sliceGroupId = null;
+      if (group) group.regionIds = group.regionIds.filter(id => id !== regionId);
+    } else {
+      // Slice-drawn region — delete entirely
+      if (group) group.regionIds = group.regionIds.filter(id => id !== regionId);
+      this.#regions = this.#regions.filter(r => r.id !== regionId);
+    }
+    if (this.#activeRegionId === regionId) this.#activeRegionId = null;
+    this.#redrawOverlay();
+    this.render();
+  }
+
+  static #onToggleGroupExpand(event, target) {
+    event.stopPropagation?.();
+    const id = target.dataset.groupId;
+    if (!id) return;
+    if (this.#collapsedGroups.has(id)) this.#collapsedGroups.delete(id);
+    else this.#collapsedGroups.add(id);
+    this.render();
   }
 
   static #onCancel() { this.close(); }

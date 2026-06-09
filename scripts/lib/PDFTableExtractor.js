@@ -52,6 +52,76 @@ export class PDFTableExtractor {
   }
 
   /**
+   * Merge multiple parsed results (from multi-page scan groups) into one.
+   * Entries are concatenated in array order and sorted by low value.
+   * Multi-column results merge per column (same column count assumed for all).
+   *
+   * @param {object[]} parsedArray  — array of objects returned by extract()
+   * @returns {{ formula: string, isMultiColumn: boolean, entries?: [], columns?: [] } | null}
+   */
+  static mergeResults(parsedArray) {
+    if (!parsedArray?.length) return null;
+    const first = parsedArray.find(p => p);
+    if (!first) return null;
+
+    if (first.isMultiColumn) {
+      const colCount = first.columns?.length ?? 1;
+      const mergedColumns = Array.from({ length: colCount }, (_, i) => ({
+        header:  first.columns[i]?.header ?? `Column ${i + 1}`,
+        entries: parsedArray.flatMap(p => p.columns?.[i]?.entries ?? [])
+      }));
+      const maxHigh = Math.max(0, ...mergedColumns[0].entries.map(e => e.high ?? e.low ?? 0));
+      const count   = mergedColumns[0].entries.length;
+      const formula = maxHigh > 0 ? `1d${maxHigh}` : count > 0 ? `1d${count}` : "";
+      return { isMultiColumn: true, columnCount: colCount, columns: mergedColumns, formula };
+    } else {
+      const allEntries = parsedArray.flatMap(p => p.entries ?? []);
+      allEntries.sort((a, b) => a.low - b.low);
+      const maxHigh = Math.max(0, ...allEntries.map(e => e.high ?? e.low ?? 0));
+      const formula = maxHigh > 0 ? `1d${maxHigh}` : allEntries.length > 0 ? `1d${allEntries.length}` : "";
+      return { isMultiColumn: false, entries: allEntries, formula };
+    }
+  }
+
+  /**
+   * Extract a single table entry from a bounding box — one box equals one entry.
+   * Immune to range bottom-alignment issues because all text in the box belongs to one entry.
+   * Returns { low, high, name } where low/high are null if no range token was found.
+   */
+  static extractSlice(textItems, rect) {
+    const items = PDFTableExtractor.#filterItems(textItems, rect);
+    if (!items.length) return { low: null, high: null, name: "" };
+
+    const rows = PDFTableExtractor.#clusterRows(items);
+    let low = null, high = null;
+    const contentParts = [];
+
+    for (const row of rows) {
+      for (const item of row) {
+        const str = item.str?.trim() ?? "";
+        if (!str) continue;
+
+        if (low === null) {
+          const tok = str.split(/\s+/)[0].replace(/[.):\]]+$/, "");
+          const m = tok.match(PasteTableParser.NUMBER_LINE);
+          if (m) {
+            low  = parseInt(m[1] ?? m[3]);
+            const rawHigh = m[2] !== undefined ? parseInt(m[2]) : low;
+            high = (rawHigh === 0 && low > 0) ? 100 : rawHigh;
+            const afterTok = str.slice(tok.length).trim();
+            if (afterTok) contentParts.push(afterTok);
+            continue;
+          }
+        }
+
+        contentParts.push(str);
+      }
+    }
+
+    return { low, high, name: contentParts.join(" ").trim() };
+  }
+
+  /**
    * Infer a dice formula for the table.
    * Priority 1: a standalone dice token in the region (e.g. "d100", "D12", "d%").
    * Priority 2: "1d{rowCount}" based on how many rows were extracted.
@@ -86,6 +156,7 @@ export class PDFTableExtractor {
 
     const allRows = PDFTableExtractor.#clusterRows(filtered);
     if (allRows.length === 0) return null;
+    PDFTableExtractor.#fixRangeAlignment(allRows);
 
     // Identify data rows: rows whose leftmost item starts with a number.
     // Continuation rows (wrapped content with no range number) are merged into
@@ -173,6 +244,7 @@ export class PDFTableExtractor {
 
     const rows = PDFTableExtractor.#clusterRows(filtered);
     if (rows.length === 0) return { formula: "", isMultiColumn: false, entries: [] };
+    PDFTableExtractor.#fixRangeAlignment(rows);
 
     // Collect X positions of items whose first whitespace-separated token is a range.
     const rangeXs = [];
@@ -322,6 +394,84 @@ export class PDFTableExtractor {
   }
 
   // ---- Private helpers ----
+
+  /**
+   * Correct for range-token vertical misalignment.
+   *
+   * In some PDFs the range number inside a multi-line cell is vertically centred,
+   * so its Y coordinate falls BELOW the first content line of that entry.
+   * #clusterRows therefore puts the content line in an earlier row than the range
+   * token, causing the content to be appended to the PREVIOUS entry instead.
+   *
+   * Fix: scan consecutive row pairs.  If prevRow contains only content items (no
+   * range token) and currRow contains only a range token (no content items),
+   * merge the range token into prevRow (sorted by X so it comes first).
+   *
+   * Mutates the rows array in place; returns it for chaining.
+   */
+  static #fixRangeAlignment(rows) {
+    const isRangeTok = item => {
+      const tok = (item.str?.trim() ?? "").split(/\s+/)[0].replace(/[.):\]]+$/, "");
+      return PasteTableParser.NUMBER_LINE.test(tok);
+    };
+
+    const meanY = row => row.reduce((s, it) => s + it.transform[5], 0) / row.length;
+
+    for (let i = 1; i < rows.length; i++) {
+      const prevRow = rows[i - 1];
+      const currRow = rows[i];
+
+      // currRow must have at least one range token.
+      const rangeItems = currRow.filter(isRangeTok);
+      if (!rangeItems.length) continue;
+
+      // prevRow must have no range token.
+      if (prevRow.some(isRangeTok)) continue;
+
+      const hasContent = currRow.some(it => it.str?.trim() && !isRangeTok(it));
+
+      if (!hasContent) {
+        // Case 1: currRow is range-only — range number appears in its own Y cluster above
+        // the content (top-aligned range). Merge it into prevRow sorted left-to-right by X.
+        const merged = [...rangeItems, ...prevRow].sort((a, b) => a.transform[4] - b.transform[4]);
+        rows[i - 1] = merged;
+        const remaining = currRow.filter(it => !rangeItems.includes(it));
+        if (remaining.length === 0) {
+          rows.splice(i, 1);
+          i--;
+        } else {
+          rows[i] = remaining;
+        }
+      } else if (i >= 2) {
+        // Case 2: currRow has range + content mixed, and the range is bottom-aligned in
+        // the PDF cell. The FIRST content line sits alone in prevRow (higher Y), while the
+        // range number aligns with the LAST content line in currRow (same Y cluster).
+        //
+        // Detect by Y proximity: prevRow belongs to currRow's entry when it is
+        // Y-closer to currRow than to prevPrevRow. Normal continuation lines are
+        // Y-close to their own entry's rows and far from the next entry.
+        const maxRangeX = Math.max(...rangeItems.map(it => it.transform[4]));
+        if (!prevRow.every(it => it.transform[4] > maxRangeX)) continue;
+
+        const prevPrevRow  = rows[i - 2];
+        const gapAbove = meanY(prevPrevRow) - meanY(prevRow);
+        const gapBelow = meanY(prevRow)     - meanY(currRow);
+
+        if (gapAbove > gapBelow) {
+          // Preserve reading order: range token first, then the orphaned first-line items
+          // (prevRow, higher Y = earlier on page), then remaining content from currRow.
+          // Do NOT sort by X — overlapping X values between different visual rows scramble order.
+          const contentFromCurr = currRow.filter(it => !isRangeTok(it));
+          const merged = [...rangeItems, ...prevRow, ...contentFromCurr];
+          rows[i - 1] = merged;
+          rows.splice(i, 1);
+          i--;
+        }
+      }
+    }
+
+    return rows;
+  }
 
   /**
    * Keep only text items whose position falls within the bounding box.
