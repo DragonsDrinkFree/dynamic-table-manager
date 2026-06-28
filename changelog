@@ -1,3 +1,12 @@
+# v1.7.0
+
+## Major
+- Added a "Convert" button to basic table header, to convert basic tables into advanced tables.
+
+
+## Minor
+- Added table "img" field to tables of all types.
+
 # v1.6.0 -> v1.6.1
 
 ## Major

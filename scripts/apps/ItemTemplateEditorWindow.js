@@ -187,7 +187,8 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
       generate:           ItemTemplateEditorWindow.#onGenerate,
       undo:               ItemTemplateEditorWindow.#onUndo,
       redo:               ItemTemplateEditorWindow.#onRedo,
-      copyUuid:           ItemTemplateEditorWindow.#onCopyUuid
+      copyUuid:           ItemTemplateEditorWindow.#onCopyUuid,
+      pickTableIcon:      ItemTemplateEditorWindow.#onPickTableIcon
     }
   };
 
@@ -222,11 +223,11 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
   }
 
   _getState() {
-    return { name: this.table.name, config: this._getConfig() };
+    return { name: this.table.name, img: this.table.img, config: this._getConfig() };
   }
 
   async _applyState(state) {
-    await this.table.update({ name: state.name });
+    await this.table.update({ name: state.name, img: state.img });
     await this.table.setFlag(MODULE_ID, "itemTemplateConfig", state.config);
   }
 
@@ -436,6 +437,7 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
 
     return {
       tableName: this.table.name,
+      tableImg: this.table.img || "icons/svg/d20-grey.svg",
       config,
       itemTypes,
       outputFolderName,
@@ -1164,6 +1166,17 @@ ${branchSections.join("\n")}
     const uuid = this.table.uuid;
     game.clipboard?.copyPlainText(uuid);
     ui.notifications.info(`Copied UUID: ${uuid}`);
+  }
+
+  static #onPickTableIcon() {
+    new FilePicker({
+      type: "image",
+      current: this.table.img || "",
+      callback: async (path) => {
+        await this.table.update({ img: path });
+        this.render();
+      }
+    }).render(true);
   }
 
   // ─────────────────────────────────────────────────────────────────────────

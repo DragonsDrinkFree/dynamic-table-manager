@@ -5,7 +5,12 @@
   <section class="dtm-editor-header">
     <div class="dtm-field-group">
       <label for="dtm-table-name">Table Name</label>
-      <input id="dtm-table-name" type="text" data-field="name" value="{{tableName}}" placeholder="Table Name" />
+      <div class="dtm-name-icon-row">
+        <button type="button" class="dtm-table-icon-btn" data-action="pickTableIcon" title="Change table icon">
+          <img class="dtm-table-icon" src="{{tableImg}}" alt="" />
+        </button>
+        <input id="dtm-table-name" type="text" data-field="name" value="{{tableName}}" placeholder="Table Name" />
+      </div>
     </div>
 
     <div class="dtm-field-row">
@@ -34,6 +39,7 @@
       </button>
       {{/if}}
     </div>
+
   </section>
 
   {{!-- Compound table banner --}}

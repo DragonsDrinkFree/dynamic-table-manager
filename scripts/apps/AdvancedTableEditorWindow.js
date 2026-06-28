@@ -118,7 +118,8 @@ export class AdvancedTableEditorWindow extends HandlebarsApplicationMixin(Applic
       roll:               AdvancedTableEditorWindow.#onRoll,
       undo:               AdvancedTableEditorWindow.#onUndo,
       redo:               AdvancedTableEditorWindow.#onRedo,
-      copyUuid:           AdvancedTableEditorWindow.#onCopyUuid
+      copyUuid:           AdvancedTableEditorWindow.#onCopyUuid,
+      pickTableIcon:      AdvancedTableEditorWindow.#onPickTableIcon
     }
   };
 
@@ -152,11 +153,11 @@ export class AdvancedTableEditorWindow extends HandlebarsApplicationMixin(Applic
   }
 
   _getState() {
-    return { name: this.table.name, config: this._getConfig() };
+    return { name: this.table.name, img: this.table.img, config: this._getConfig() };
   }
 
   async _applyState(state) {
-    await this.table.update({ name: state.name });
+    await this.table.update({ name: state.name, img: state.img });
     await this.table.setFlag(MODULE_ID, "advancedTableConfig", state.config);
   }
 
@@ -320,6 +321,7 @@ export class AdvancedTableEditorWindow extends HandlebarsApplicationMixin(Applic
     const actionTreeHtml = await this._buildTreeHtml(config.actions, null, null, 0);
     return {
       tableName: this.table.name,
+      tableImg: this.table.img || "icons/svg/d20-grey.svg",
       actionTreeHtml,
       canUndo: this.undoManager.canUndo(),
       canRedo: this.undoManager.canRedo()
@@ -978,6 +980,17 @@ ${branchSections.join("\n")}
     const uuid = this.table.uuid;
     game.clipboard?.copyPlainText(uuid);
     ui.notifications.info(`Copied UUID: ${uuid}`);
+  }
+
+  static #onPickTableIcon() {
+    new FilePicker({
+      type: "image",
+      current: this.table.img || "",
+      callback: async (path) => {
+        await this.table.update({ img: path });
+        this.render();
+      }
+    }).render(true);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
