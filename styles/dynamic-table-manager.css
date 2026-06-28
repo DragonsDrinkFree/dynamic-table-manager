@@ -2225,6 +2225,9 @@ input.dtm-col-range:disabled {
   white-space: nowrap;
 }
 
+/* Advanced table editor: strip header horizontal padding so icon aligns with toolbar buttons */
+.dtm-at-window .dtm-it-header { padding-left: 0; padding-right: 0; }
+
 /* ── Toolbar ── */
 .dtm-it-toolbar { flex-shrink: 0; }
 
@@ -3223,5 +3226,39 @@ input.dtm-col-range:disabled {
   background: rgba(40, 180, 160, 0.2);
   flex-shrink: 0;
   font-size: 10px;
+}
+
+/* ── Table icon + name row ── */
+.dtm-name-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dtm-name-icon-row > input {
+  flex: 1;
+  min-width: 0;
+}
+.dtm-table-icon-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dtm-table-icon-btn:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.05);
+}
+.dtm-table-icon {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  border-radius: 2px;
 }
 

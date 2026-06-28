@@ -81,7 +81,8 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       changeAllTypes: TableEditorWindow.#onChangeAllTypes,
       copyUuid:       TableEditorWindow.#onCopyUuid,
       toggleDrawn:    TableEditorWindow.#onToggleDrawn,
-      resetDrawn:     TableEditorWindow.#onResetDrawn
+      resetDrawn:     TableEditorWindow.#onResetDrawn,
+      pickTableIcon:  TableEditorWindow.#onPickTableIcon
     }
   };
 
@@ -138,6 +139,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     return {
       table: this.table,
       tableName: this.table.name,
+      tableImg: this.table.img || "icons/svg/d20-grey.svg",
       formula: this.table.formula,
       description: this.table.description,
       results: mappedResults,
@@ -221,6 +223,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
   _getTableState() {
     return {
       name: this.table.name,
+      img: this.table.img,
       formula: this.table.formula,
       description: this.table.description,
       replacement: this.table.replacement ?? true,
@@ -403,6 +406,17 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       drawn.map(r => ({ _id: r.id, drawn: false }))
     );
     this.render();
+  }
+
+  static #onPickTableIcon() {
+    new FilePicker({
+      type: "image",
+      current: this.table.img || "",
+      callback: async (path) => {
+        await this.table.update({ img: path });
+        this.render();
+      }
+    }).render(true);
   }
 
   static async #onUndo() {

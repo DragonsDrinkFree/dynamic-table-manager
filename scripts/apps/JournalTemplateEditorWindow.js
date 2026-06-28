@@ -53,7 +53,8 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
       rollTemplate:      JournalTemplateEditorWindow.#onRollTemplate,
       undo:              JournalTemplateEditorWindow.#onUndo,
       redo:              JournalTemplateEditorWindow.#onRedo,
-      copyUuid:          JournalTemplateEditorWindow.#onCopyUuid
+      copyUuid:          JournalTemplateEditorWindow.#onCopyUuid,
+      pickTableIcon:     JournalTemplateEditorWindow.#onPickTableIcon
     }
   };
 
@@ -114,6 +115,7 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
 
     return {
       tableName: this.table.name,
+      tableImg: this.table.img || "icons/svg/d20-grey.svg",
       templatePageName,
       templatePageUuid,
       outputJournalName,
@@ -332,6 +334,17 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
     }));
   }
 
+  static #onPickTableIcon() {
+    new FilePicker({
+      type: "image",
+      current: this.table.img || "",
+      callback: async (path) => {
+        await this.table.update({ img: path });
+        this.render();
+      }
+    }).render(true);
+  }
+
   // ---- State helpers ---------------------------------------------------------
 
   _sortedRows() {
@@ -345,6 +358,7 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
   _getState() {
     return {
       name: this.table.name,
+      img: this.table.img,
       templatePageUuid: this.table.getFlag("dynamic-table-manager", "templatePageUuid") ?? null,
       outputJournalId:  this.table.getFlag("dynamic-table-manager", "outputJournalId") ?? null,
       results: this.table.results.contents.map(r => r.toObject())
@@ -357,7 +371,7 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
   }
 
   async _applyState(state) {
-    await this.table.update({ name: state.name });
+    await this.table.update({ name: state.name, img: state.img });
     await this.table.setFlag("dynamic-table-manager", "templatePageUuid", state.templatePageUuid ?? null);
 
     if (state.outputJournalId) {

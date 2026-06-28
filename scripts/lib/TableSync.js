@@ -40,6 +40,7 @@ export class TableSync {
       description: state.description
     };
     if (state.replacement !== undefined) tableUpdate.replacement = state.replacement;
+    if (state.img !== undefined) tableUpdate.img = state.img;
     await this.#table.update(tableUpdate);
 
     // Replace all results: delete existing, then create from state

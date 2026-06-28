@@ -5,7 +5,12 @@
   <div class="dtm-it-header">
     <div class="dtm-field-group">
       <label>Table Name</label>
-      <input type="text" data-field="tableName" value="{{tableName}}" />
+      <div class="dtm-name-icon-row">
+        <button type="button" class="dtm-table-icon-btn" data-action="pickTableIcon" title="Change table icon">
+          <img class="dtm-table-icon" src="{{tableImg}}" alt="" />
+        </button>
+        <input type="text" data-field="tableName" value="{{tableName}}" />
+      </div>
     </div>
   </div>{{!-- /.dtm-it-header --}}
 
