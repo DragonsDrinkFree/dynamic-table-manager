@@ -3262,3 +3262,20 @@ input.dtm-col-range:disabled {
   border-radius: 2px;
 }
 
+/* ── Convert to Advanced button (window title bar) ── */
+.dtm-convert-btn {
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 200, 80, 0.5);
+  border-radius: 3px;
+  background: rgba(255, 200, 80, 0.1);
+  color: rgba(255, 200, 80, 0.9);
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.dtm-convert-btn:hover {
+  border-color: rgba(255, 200, 80, 0.8);
+  background: rgba(255, 200, 80, 0.2);
+  color: rgba(255, 200, 80, 1.0);
+}

@@ -5,8 +5,10 @@ import { LinkMatcher } from "../lib/LinkMatcher.js";
 import { DetectLinksDialog } from "./DetectLinksDialog.js";
 import { DocumentPickerPopup } from "./DocumentPickerPopup.js";
 import { parseRange } from "../lib/RangeParser.js";
+import { AdvancedTableEditorWindow } from "./AdvancedTableEditorWindow.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+const MODULE_ID = "dynamic-table-manager";
 
 /**
  * Single-table editor popout window.
@@ -81,8 +83,9 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       changeAllTypes: TableEditorWindow.#onChangeAllTypes,
       copyUuid:       TableEditorWindow.#onCopyUuid,
       toggleDrawn:    TableEditorWindow.#onToggleDrawn,
-      resetDrawn:     TableEditorWindow.#onResetDrawn,
-      pickTableIcon:  TableEditorWindow.#onPickTableIcon
+      resetDrawn:        TableEditorWindow.#onResetDrawn,
+      pickTableIcon:     TableEditorWindow.#onPickTableIcon,
+      convertToAdvanced: TableEditorWindow.#onConvertToAdvanced
     }
   };
 
@@ -419,6 +422,103 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
     }).render(true);
   }
 
+  static async #onConvertToAdvanced() {
+    const dialogResult = await foundry.applications.api.DialogV2.wait({
+      window: { title: "Convert to Advanced Table" },
+      position: { width: 360 },
+      content: `
+        <p style="margin:0 0 8px;font-size:12px;"><strong>Warning:</strong> This process will convert your basic table into an advanced table. This process is non-reversible. It is recommended you keep a backup copy of the basic table before experimenting.</p>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;">
+          <input type="checkbox" name="backup" checked />
+          Create backup before converting
+        </label>
+      `,
+      rejectClose: false,
+      buttons: [
+        {
+          action: "convert",
+          label: "Convert",
+          icon: "fas fa-exchange-alt",
+          default: true,
+          callback: (_ev, _btn, dialog) =>
+            dialog.element.querySelector("[name='backup']")?.checked ?? true
+        },
+        { action: "cancel", label: "Cancel", icon: "fas fa-times" }
+      ]
+    });
+    if (!dialogResult || dialogResult === "cancel") return;
+    const createBackup = dialogResult;
+
+    if (createBackup) {
+      const tableData = this.table.toObject();
+      delete tableData._id;
+      tableData.name = `basic: ${this.table.name}`;
+      if (tableData.flags?.[MODULE_ID]) {
+        delete tableData.flags[MODULE_ID].tableType;
+        delete tableData.flags[MODULE_ID].advancedTableConfig;
+      }
+      await RollTable.create(tableData);
+    }
+
+    const advancedConfig = TableEditorWindow.#buildAdvancedConfig(this.table);
+
+    const resultIds = this.table.results.contents.map(r => r.id);
+    if (resultIds.length) {
+      await this.table.deleteEmbeddedDocuments("TableResult", resultIds);
+    }
+
+    await this.table.setFlag(MODULE_ID, "tableType", "advanced-table");
+    await this.table.setFlag(MODULE_ID, "advancedTableConfig", advancedConfig);
+
+    this.close();
+    AdvancedTableEditorWindow.openForTable(this.table);
+  }
+
+  static #buildAdvancedConfig(table) {
+    const formula = table.formula || "d6";
+
+    const rangeMap = new Map();
+    for (const r of table.results.contents) {
+      const [low, high] = r.range;
+      const key = `${low}-${high}`;
+      if (!rangeMap.has(key)) rangeMap.set(key, { low, high, rows: [] });
+      rangeMap.get(key).rows.push(r);
+    }
+
+    const branches = [...rangeMap.values()]
+      .sort((a, b) => a.low - b.low)
+      .map(({ low, high, rows }) => {
+        const label = low === high ? `${low}` : `${low}-${high}`;
+        const actions = rows.map(r => {
+          const isDoc = r.type === CONST.TABLE_RESULT_TYPES.DOCUMENT;
+          return {
+            id: foundry.utils.randomID(),
+            type: "output",
+            label: "",
+            sourceType: isDoc ? "document" : "text",
+            value: isDoc ? "" : (r.name || ""),
+            tableUuid: null,
+            tableName: null,
+            tableField: "name",
+            documentUuid: isDoc ? (r.documentUuid || null) : null,
+            documentName: isDoc ? (r.name || null) : null
+          };
+        });
+        return { id: foundry.utils.randomID(), label, low, high, actions };
+      });
+
+    return {
+      actions: [{
+        id: foundry.utils.randomID(),
+        type: "conditional",
+        label: "Converted",
+        die: formula,
+        loop: 1,
+        branches
+      }]
+    };
+  }
+
   static async #onUndo() {
     if (!this.undoManager.canUndo()) return;
     const state = this.undoManager.undo();
@@ -727,6 +827,17 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
       btn.dataset.action = "copyUuid";
       btn.dataset.tooltip = "Copy UUID";
       btn.setAttribute("aria-label", "Copy UUID");
+      toggleBtn.before(btn);
+    }
+
+    // Inject Convert to Advanced button into the title bar
+    if (toggleBtn && !html.querySelector('.window-header [data-action="convertToAdvanced"]')) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dtm-convert-btn";
+      btn.dataset.action = "convertToAdvanced";
+      btn.title = "Convert to Advanced table";
+      btn.innerHTML = '<i class="fas fa-exchange-alt"></i> Convert';
       toggleBtn.before(btn);
     }
 
