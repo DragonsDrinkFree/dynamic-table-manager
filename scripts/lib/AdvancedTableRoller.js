@@ -95,8 +95,9 @@ export class AdvancedTableRoller {
           const times = await AdvancedTableRoller._resolveLoopCount(action.loop);
           for (let i = 0; i < times; i++) {
             let selectedBranch;
-            const die = action.die ?? "d6";
-            const roll = await new Roll(`1${die}`).evaluate();
+            let die = action.die ?? "1d6";
+            if ( die.toLowerCase().startsWith("d") ) die = `1${die}`;
+            const roll = await new Roll(die).evaluate();
             for (const branch of action.branches) {
               if (branch.isElse) continue;
               if (roll.total >= (branch.low ?? 1) && roll.total <= (branch.high ?? 1)) {
