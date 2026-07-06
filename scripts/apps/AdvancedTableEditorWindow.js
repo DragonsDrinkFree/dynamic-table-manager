@@ -456,7 +456,7 @@ export class AdvancedTableEditorWindow extends HandlebarsApplicationMixin(Applic
       <i class="fas fa-caret-down dtm-it-collapse-chevron"></i>
       <i class="fas fa-code-branch dtm-it-block-icon"></i>
     </span>
-    <input type="text" class="dtm-it-cond-die" data-field="condDie" data-action-id="${id}" value="${_esc(die)}" placeholder="d6" title="Die formula (e.g. d6, 2d6, d100)" />
+    <input type="text" class="dtm-it-cond-die" data-field="condDie" data-action-id="${id}" value="${_esc(die)}" placeholder="d6" title="Die formula (e.g. d6, 4d6, 2d20kh1, d100)" />
     <input class="dtm-it-col-label dtm-it-cond-label" type="text" data-field="condLabel" data-action-id="${id}" value="${label}" placeholder="Label…" />
     <span class="dtm-at-loop-label" title="Repeat count">×</span>
     <input type="text" class="dtm-at-loop-input" data-field="condLoop" data-action-id="${id}" value="${_esc(String(action.loop ?? 1))}" placeholder="1" title="Repeat N times — enter a number (3) or dice (d6, 2d4)" />
@@ -598,7 +598,7 @@ ${branchSections.join("\n")}
   async _handleDocumentDrop(ev, actionId) {
     if (!actionId) return;
     let data;
-    try { data = TextEditor.getDragEventData(ev); } catch (_) { return; }
+    try { data = foundry.applications.ux.TextEditor.implementation.getDragEventData(ev); } catch (_) { return; }
     if (!data?.uuid) return;
     const doc = await fromUuid(data.uuid).catch(() => null);
     if (!doc) return;
@@ -613,7 +613,7 @@ ${branchSections.join("\n")}
 
   async _createDocumentOutput(ev, dropTarget, tree) {
     let data;
-    try { data = TextEditor.getDragEventData(ev); } catch (_) { return; }
+    try { data = foundry.applications.ux.TextEditor.implementation.getDragEventData(ev); } catch (_) { return; }
     if (!data?.uuid) return;
     const doc = await fromUuid(data.uuid).catch(() => null);
     if (!doc) return;

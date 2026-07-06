@@ -935,7 +935,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
         const state = this._dragState;
         this._clearDragVisuals(rowList, indicator);
         this._dragState = null;
-        const data = TextEditor.getDragEventData(ev);
+        const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(ev);
         if (data?.type === "dtm-row-reorder") {
           await this._handleRowReorder(data.resultId, state?.insertIndex ?? -1);
           return;

@@ -602,7 +602,7 @@ export class ItemTemplateEditorWindow extends HandlebarsApplicationMixin(Applica
       <i class="fas fa-caret-down dtm-it-collapse-chevron"></i>
       <i class="fas fa-code-branch dtm-it-block-icon"></i>
     </span>
-    <input type="text" class="dtm-it-cond-die" data-field="condDie" data-action-id="${id}" value="${_esc(die)}" placeholder="d6" title="Die formula (e.g. d6, 2d6, d100)" />
+    <input type="text" class="dtm-it-cond-die" data-field="condDie" data-action-id="${id}" value="${_esc(die)}" placeholder="d6" title="Die formula (e.g. d6, 4d6, 2d20kh1, d100)" />
     <input class="dtm-it-col-label dtm-it-cond-label" type="text" data-field="condLabel" data-action-id="${id}" value="${label}" placeholder="Label…" />
     <button type="button" class="dtm-icon-btn"               data-action="addBranch"       data-action-id="${id}" title="Add range branch"><i class="fas fa-plus"></i> Branch</button>
     <button type="button" class="dtm-icon-btn"               data-action="duplicateAction" data-action-id="${id}" title="Duplicate conditional (with children)"><i class="fas fa-clone"></i></button>

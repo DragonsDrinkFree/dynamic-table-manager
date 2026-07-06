@@ -2273,7 +2273,7 @@ input.dtm-col-range:disabled {
 .dtm-it-col-append  { flex: 0 0 68px;  width: 68px;  font-size: 11px; }
 .dtm-it-col-sep     { flex: 0 0 52px;  width: 52px;  font-size: 11px; }
 .dtm-it-col-tfield  { flex: 0 0 100px; width: 100px; font-size: 11px; }
-.dtm-it-cond-die    { flex: 0 0 68px;  width: 68px;  font-size: 11px; }
+.dtm-it-cond-die    { flex: 0 0 100px; width: 100px; font-size: 11px; }
 .dtm-it-cond-label  { flex: 0.75 1 0; }
 
 /* Vertical separator between the write-mode group and the source group */

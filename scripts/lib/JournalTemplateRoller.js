@@ -1,4 +1,5 @@
 import { parseRange } from "./RangeParser.js";
+import { DiceFormulaParser } from "./DiceFormulaParser.js";
 import { JournalTemplateRollDialog } from "../apps/JournalTemplateRollDialog.js";
 
 /**
@@ -128,7 +129,7 @@ export class JournalTemplateRoller {
       const triggerRangeStr = row.getFlag("dynamic-table-manager", "triggerRange") ?? "1";
       const triggerRange = parseRange(triggerRangeStr);
       if (!triggerRange) return false;
-      const roll = await new Roll(`1${die}`).evaluate();
+      const roll = await new Roll(DiceFormulaParser.toRollFormula(die)).evaluate();
       return roll.total >= triggerRange[0] && roll.total <= triggerRange[1];
     }
 
