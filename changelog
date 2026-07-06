@@ -3,6 +3,7 @@
 ## Minor
 - Resolved unintended backend interpretation of dice rolls for conditionals that was blocking advanced formulas(2d4, 3d6, 2d20, etc) from parsing correctly.
 - Added support for Formula enhancers: kh,dh,dl: 3d6kh2, 4d4dl3, etc
+- Performance audits/enhancements.
 
 
 # v1.7.0

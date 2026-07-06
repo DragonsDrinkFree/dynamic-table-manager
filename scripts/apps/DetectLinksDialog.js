@@ -116,6 +116,11 @@ export class DetectLinksDialog extends HandlebarsApplicationMixin(ApplicationV2)
 
   /** @override */
   _onRender(context, options) {
+    // Abort previous listeners before attaching new ones (element persists across renders).
+    this._listenerAbort?.abort();
+    this._listenerAbort = new AbortController();
+    const { signal } = this._listenerAbort;
+
     const html = this.element;
 
     // Manual search input — update query and open dropdown
@@ -127,7 +132,7 @@ export class DetectLinksDialog extends HandlebarsApplicationMixin(ApplicationV2)
       row.searchQuery  = ev.target.value;
       row.dropdownOpen = ev.target.value.length >= 2;
       this.render();
-    });
+    }, { signal });
 
     // Click a dropdown item → accept that entry manually
     html.addEventListener("click", (ev) => {
@@ -146,7 +151,7 @@ export class DetectLinksDialog extends HandlebarsApplicationMixin(ApplicationV2)
       row.searchQuery  = "";
       row.dropdownOpen = false;
       this.render();
-    });
+    }, { signal });
 
     // Click outside a search wrap → close all dropdowns
     html.addEventListener("click", (ev) => {
@@ -156,7 +161,7 @@ export class DetectLinksDialog extends HandlebarsApplicationMixin(ApplicationV2)
         if (row.dropdownOpen) { row.dropdownOpen = false; changed = true; }
       }
       if (changed) this.render();
-    });
+    }, { signal });
   }
 
   // ---- Private helpers ----
@@ -233,5 +238,10 @@ export class DetectLinksDialog extends HandlebarsApplicationMixin(ApplicationV2)
 
   static #onCancelDialog() {
     this.close();
+  }
+
+  /** @override */
+  _onClose(options) {
+    this._listenerAbort?.abort();
   }
 }

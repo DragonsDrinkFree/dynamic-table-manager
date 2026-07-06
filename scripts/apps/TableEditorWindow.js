@@ -925,6 +925,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
       rowList.addEventListener("dragleave", (ev) => {
         if (!rowList.contains(ev.relatedTarget)) {
+          this._cancelDragOverRaf();
           this._clearDragVisuals(rowList, indicator);
           this._dragState = null;
         }
@@ -932,6 +933,7 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
 
       rowList.addEventListener("drop", async (ev) => {
         ev.preventDefault();
+        this._cancelDragOverRaf();
         const state = this._dragState;
         this._clearDragVisuals(rowList, indicator);
         this._dragState = null;
@@ -1271,27 +1273,39 @@ export class TableEditorWindow extends HandlebarsApplicationMixin(ApplicationV2)
    * Update drag visuals: row highlight or insert indicator line.
    */
   _onDragOver(ev, rowList, indicator) {
-    const state = this._getDragTarget(ev, rowList);
-    this._dragState = state;
-    const rows = [...rowList.querySelectorAll(".dtm-row")];
+    // dragover fires faster than frames render — defer the DOM work (row
+    // queries, rects, indicator placement) to at most once per animation frame.
+    this._dragOverPoint = { clientX: ev.clientX, clientY: ev.clientY };
+    if (this._dragOverRaf) return;
+    this._dragOverRaf = requestAnimationFrame(() => {
+      this._dragOverRaf = null;
+      const pt = this._dragOverPoint;
+      const state = this._getDragTarget(pt, rowList);
+      this._dragState = state;
+      const rows = [...rowList.querySelectorAll(".dtm-row")];
 
-    // Clear existing highlights
-    rows.forEach(r => r.classList.remove("dtm-drag-over"));
-    indicator.style.display = "none";
+      // Clear existing highlights
+      rows.forEach(r => r.classList.remove("dtm-drag-over"));
+      indicator.style.display = "none";
 
-    if (state.mode === "replace") {
-      rows.find(r => r.dataset.resultId === state.rowId)?.classList.add("dtm-drag-over");
-    } else {
-      // Position the insert indicator line
-      indicator.style.display = "block";
-      if (state.insertIndex === 0) {
-        rowList.insertBefore(indicator, rows[0] ?? null);
-      } else if (state.insertIndex >= rows.length) {
-        rowList.appendChild(indicator);
+      if (state.mode === "replace") {
+        rows.find(r => r.dataset.resultId === state.rowId)?.classList.add("dtm-drag-over");
       } else {
-        rowList.insertBefore(indicator, rows[state.insertIndex]);
+        // Position the insert indicator line
+        indicator.style.display = "block";
+        if (state.insertIndex === 0) {
+          rowList.insertBefore(indicator, rows[0] ?? null);
+        } else if (state.insertIndex >= rows.length) {
+          rowList.appendChild(indicator);
+        } else {
+          rowList.insertBefore(indicator, rows[state.insertIndex]);
+        }
       }
-    }
+    });
+  }
+
+  _cancelDragOverRaf() {
+    if (this._dragOverRaf) { cancelAnimationFrame(this._dragOverRaf); this._dragOverRaf = null; }
   }
 
   /**

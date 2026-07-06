@@ -131,6 +131,11 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
 
   /** @override */
   _onRender(_context, _options) {
+    // Abort previous listeners before attaching new ones (element persists across renders).
+    this._listenerAbort?.abort();
+    this._listenerAbort = new AbortController();
+    const { signal } = this._listenerAbort;
+
     const html = this.element;
 
     // Inject copy-UUID button directly onto the title bar (before the "..." overflow menu)
@@ -145,8 +150,8 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
       toggleBtn.before(btn);
     }
 
-    html.addEventListener("change", ev => this._onFieldChange(ev));
-    html.addEventListener("keydown", ev => this._onKeyDown(ev));
+    html.addEventListener("change", ev => this._onFieldChange(ev), { signal });
+    html.addEventListener("keydown", ev => this._onKeyDown(ev), { signal });
 
     // Prevent Enter on inputs from bubbling
     html.addEventListener("keydown", ev => {
@@ -155,7 +160,7 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
         ev.stopPropagation();
         ev.target.blur();
       }
-    });
+    }, { signal });
   }
 
   // ---- Field change ----------------------------------------------------------
@@ -392,6 +397,7 @@ export class JournalTemplateEditorWindow extends HandlebarsApplicationMixin(Appl
 
   /** @override */
   _onClose() {
+    this._listenerAbort?.abort();
     JournalTemplateEditorWindow._instances.delete(this.table.id);
   }
 }

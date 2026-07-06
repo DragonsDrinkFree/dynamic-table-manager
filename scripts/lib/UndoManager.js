@@ -5,6 +5,9 @@
  */
 export class UndoManager {
 
+  /** Maximum retained undo steps — each holds full before/after snapshots. */
+  static MAX_HISTORY = 50;
+
   /** @type {object[]} Stack of undo actions */
   #undoStack = [];
 
@@ -20,6 +23,7 @@ export class UndoManager {
    */
   record(action) {
     this.#undoStack.push(action);
+    if (this.#undoStack.length > UndoManager.MAX_HISTORY) this.#undoStack.shift();
     this.#redoStack = [];
   }
 
