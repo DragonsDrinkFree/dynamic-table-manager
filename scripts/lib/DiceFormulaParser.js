@@ -72,4 +72,17 @@ export class DiceFormulaParser {
     }
     return rows;
   }
+
+  /**
+   * Build a complete Foundry roll formula from a "die" field value.
+   * Bare suffixes like "d6"/"d20" get an implicit leading "1".
+   * Values that already specify a count ("4d6", "2d20kh1") are passed through
+   * unchanged so Foundry's Roll parser handles counts/modifiers natively.
+   * @param {string} die
+   * @returns {string}
+   */
+  static toRollFormula(die) {
+    const trimmed = (die ?? "").toString().trim() || "d6";
+    return /^\d/.test(trimmed) ? trimmed : `1${trimmed}`;
+  }
 }

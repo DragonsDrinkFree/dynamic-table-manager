@@ -8,12 +8,6 @@ export class TableSync {
   /** @type {RollTable} */
   #table;
 
-  /** @type {number|null} Debounce timer ID */
-  #debounceTimer = null;
-
-  /** @type {number} Debounce delay in ms */
-  static DEBOUNCE_MS = 300;
-
   /**
    * @param {RollTable} table - The Foundry RollTable document to sync with
    */
@@ -29,9 +23,6 @@ export class TableSync {
    */
   async applyState(state) {
     if (!state) return;
-
-    // Cancel any pending debounced update
-    this._cancelDebounce();
 
     // Update top-level table fields
     const tableUpdate = {
@@ -59,26 +50,4 @@ export class TableSync {
     }
   }
 
-  /**
-   * Debounced update for a single field change.
-   * Groups rapid edits into a single database write.
-   * @param {object} updateData - Data to pass to table.update()
-   */
-  debouncedUpdate(updateData) {
-    this._cancelDebounce();
-    this.#debounceTimer = setTimeout(async () => {
-      await this.#table.update(updateData);
-      this.#debounceTimer = null;
-    }, TableSync.DEBOUNCE_MS);
-  }
-
-  /**
-   * Cancel any pending debounced update.
-   */
-  _cancelDebounce() {
-    if (this.#debounceTimer !== null) {
-      clearTimeout(this.#debounceTimer);
-      this.#debounceTimer = null;
-    }
-  }
 }

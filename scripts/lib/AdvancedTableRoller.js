@@ -1,4 +1,5 @@
 import { ItemTemplateRoller } from "./ItemTemplateRoller.js";
+import { DiceFormulaParser } from "./DiceFormulaParser.js";
 
 const DUMMY_RESULT_NAME = "Dynamic Table: Advanced Table";
 const DUMMY_RESULT_TEXT =
@@ -58,7 +59,7 @@ export class AdvancedTableRoller {
     await AdvancedTableRoller._evaluateActions(config.actions ?? [], ctx);
 
     const rawHtml = AdvancedTableRoller._buildCardHtml(table.name, ctx.outputs);
-    const enriched = await TextEditor.enrichHTML(rawHtml, { async: true });
+    const enriched = await foundry.applications.ux.TextEditor.implementation.enrichHTML(rawHtml, { async: true });
 
     await ChatMessage.create({
       content: enriched,
@@ -96,7 +97,7 @@ export class AdvancedTableRoller {
           for (let i = 0; i < times; i++) {
             let selectedBranch;
             const die = action.die ?? "d6";
-            const roll = await new Roll(`1${die}`).evaluate();
+            const roll = await new Roll(DiceFormulaParser.toRollFormula(die)).evaluate();
             for (const branch of action.branches) {
               if (branch.isElse) continue;
               if (roll.total >= (branch.low ?? 1) && roll.total <= (branch.high ?? 1)) {

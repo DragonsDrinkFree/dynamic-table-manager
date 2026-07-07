@@ -167,8 +167,8 @@ export class AdvancedTableEditorWindow extends HandlebarsApplicationMixin(Applic
     const before = { name: this.table.name, config: foundry.utils.deepClone(flag) };
     migrateActions(before.config.actions);
 
-    const config = foundry.utils.deepClone(flag);
-    migrateActions(config.actions);
+    // Clone the already-migrated copy so the migration walk runs only once.
+    const config = foundry.utils.deepClone(before.config);
 
     await mutate(config);
 
@@ -456,7 +456,7 @@ export class AdvancedTableEditorWindow extends HandlebarsApplicationMixin(Applic
       <i class="fas fa-caret-down dtm-it-collapse-chevron"></i>
       <i class="fas fa-code-branch dtm-it-block-icon"></i>
     </span>
-    <input type="text" class="dtm-it-cond-die" data-field="condDie" data-action-id="${id}" value="${_esc(die)}" placeholder="d6" title="Die formula (e.g. d6, 2d6, d100)" />
+    <input type="text" class="dtm-it-cond-die" data-field="condDie" data-action-id="${id}" value="${_esc(die)}" placeholder="d6" title="Die formula (e.g. d6, 4d6, 2d20kh1, d100)" />
     <input class="dtm-it-col-label dtm-it-cond-label" type="text" data-field="condLabel" data-action-id="${id}" value="${label}" placeholder="Label…" />
     <span class="dtm-at-loop-label" title="Repeat count">×</span>
     <input type="text" class="dtm-at-loop-input" data-field="condLoop" data-action-id="${id}" value="${_esc(String(action.loop ?? 1))}" placeholder="1" title="Repeat N times — enter a number (3) or dice (d6, 2d4)" />
@@ -539,32 +539,40 @@ ${branchSections.join("\n")}
     ev.preventDefault();
     ev.dataTransfer.dropEffect = "link";
 
-    // Compute drop zone + insertion index, render a drop line, same as internal drag.
-    this._clearDragVisuals(tree);
-    tree.classList.add("dtm-doc-drop-target");
+    // Compute drop zone + insertion index, render a drop line, same as internal
+    // drag — throttled to one DOM pass per animation frame.
+    this._dragOverPoint = { clientX: ev.clientX, clientY: ev.clientY };
+    if (this._dragOverRaf) return;
+    this._dragOverRaf = requestAnimationFrame(() => {
+      this._dragOverRaf = null;
+      if (this._drag) return;
+      const pt = this._dragOverPoint;
+      this._clearDragVisuals(tree);
+      tree.classList.add("dtm-doc-drop-target");
 
-    const dropZone = this._findDropZone(ev, tree);
-    const idx = this._getInsertIndex(dropZone, ev, null);
-    const children = [...dropZone.querySelectorAll(":scope > .dtm-it-action-row, :scope > .dtm-it-block")];
+      const dropZone = this._findDropZone(pt, tree);
+      const idx = this._getInsertIndex(dropZone, pt, null);
+      const children = [...dropZone.querySelectorAll(":scope > .dtm-it-action-row, :scope > .dtm-it-block")];
 
-    dropZone.classList.add("dtm-drag-over");
+      dropZone.classList.add("dtm-drag-over");
 
-    const line = document.createElement("div");
-    line.className = "dtm-drop-line";
-    if (idx < children.length) children[idx].before(line);
-    else {
-      const addRow = dropZone.querySelector(":scope > .dtm-it-add-row");
-      if (addRow) addRow.before(line);
-      else dropZone.appendChild(line);
-    }
+      const line = this._getDropLine();
+      if (idx < children.length) children[idx].before(line);
+      else {
+        const addRow = dropZone.querySelector(":scope > .dtm-it-add-row");
+        if (addRow) addRow.before(line);
+        else dropZone.appendChild(line);
+      }
 
-    this._externalDropTarget = { zone: dropZone, index: idx };
+      this._externalDropTarget = { zone: dropZone, index: idx };
+    });
   }
 
   _onExternalDragLeave(ev) {
     if (this._drag) return;
     const tree = this.element?.querySelector(".dtm-it-tree");
     if (tree && !tree.contains(ev.relatedTarget)) {
+      this._cancelDragOverRaf();
       this._clearDragVisuals(tree);
       tree.classList.remove("dtm-doc-drop-target");
       this._externalDropTarget = null;
@@ -573,6 +581,7 @@ ${branchSections.join("\n")}
 
   async _onExternalDrop(ev) {
     if (this._drag) return; // internal tree drag handles its own drop
+    this._cancelDragOverRaf();
     const tree = this.element?.querySelector(".dtm-it-tree");
     if (tree) {
       this._clearDragVisuals(tree);
@@ -598,7 +607,7 @@ ${branchSections.join("\n")}
   async _handleDocumentDrop(ev, actionId) {
     if (!actionId) return;
     let data;
-    try { data = TextEditor.getDragEventData(ev); } catch (_) { return; }
+    try { data = foundry.applications.ux.TextEditor.implementation.getDragEventData(ev); } catch (_) { return; }
     if (!data?.uuid) return;
     const doc = await fromUuid(data.uuid).catch(() => null);
     if (!doc) return;
@@ -613,7 +622,7 @@ ${branchSections.join("\n")}
 
   async _createDocumentOutput(ev, dropTarget, tree) {
     let data;
-    try { data = TextEditor.getDragEventData(ev); } catch (_) { return; }
+    try { data = foundry.applications.ux.TextEditor.implementation.getDragEventData(ev); } catch (_) { return; }
     if (!data?.uuid) return;
     const doc = await fromUuid(data.uuid).catch(() => null);
     if (!doc) return;
@@ -733,6 +742,19 @@ ${branchSections.join("\n")}
     tree.querySelectorAll(".dtm-drag-over").forEach(el => el.classList.remove("dtm-drag-over"));
   }
 
+  /** Lazily create and reuse a single drop-indicator element. */
+  _getDropLine() {
+    if (!this._dropLine) {
+      this._dropLine = document.createElement("div");
+      this._dropLine.className = "dtm-drop-line";
+    }
+    return this._dropLine;
+  }
+
+  _cancelDragOverRaf() {
+    if (this._dragOverRaf) { cancelAnimationFrame(this._dragOverRaf); this._dragOverRaf = null; }
+  }
+
   _onDragStart(ev, tree) {
     const el = ev.target.closest("[data-action-id]");
     if (!el || !el.hasAttribute("draggable")) return;
@@ -771,25 +793,34 @@ ${branchSections.join("\n")}
     ev.preventDefault();
     ev.dataTransfer.dropEffect = "move";
     this._dragLastY = ev.clientY;
-    this._clearDragVisuals(tree);
-    const zone = this._findDropZone(ev, tree);
-    const idx  = this._getInsertIndex(zone, ev, this._drag.actionId);
-    const children = [...zone.querySelectorAll(":scope > .dtm-it-action-row, :scope > .dtm-it-block")]
-      .filter(el => el.dataset.actionId !== this._drag.actionId);
-    zone.classList.add("dtm-drag-over");
-    const line = document.createElement("div");
-    line.className = "dtm-drop-line";
-    if (idx < children.length) children[idx].before(line);
-    else {
-      const addRow = zone.querySelector(":scope > .dtm-it-add-row");
-      if (addRow) addRow.before(line);
-      else zone.appendChild(line);
-    }
-    this._dropTarget = { zone, index: idx };
+    // dragover fires faster than frames render — defer the DOM work (queries,
+    // rects, indicator placement) to at most once per animation frame.
+    this._dragOverPoint = { clientX: ev.clientX, clientY: ev.clientY };
+    if (this._dragOverRaf) return;
+    this._dragOverRaf = requestAnimationFrame(() => {
+      this._dragOverRaf = null;
+      if (!this._drag) return;
+      const pt = this._dragOverPoint;
+      this._clearDragVisuals(tree);
+      const zone = this._findDropZone(pt, tree);
+      const idx  = this._getInsertIndex(zone, pt, this._drag.actionId);
+      const children = [...zone.querySelectorAll(":scope > .dtm-it-action-row, :scope > .dtm-it-block")]
+        .filter(el => el.dataset.actionId !== this._drag.actionId);
+      zone.classList.add("dtm-drag-over");
+      const line = this._getDropLine();
+      if (idx < children.length) children[idx].before(line);
+      else {
+        const addRow = zone.querySelector(":scope > .dtm-it-add-row");
+        if (addRow) addRow.before(line);
+        else zone.appendChild(line);
+      }
+      this._dropTarget = { zone, index: idx };
+    });
   }
 
   _onDragLeave(ev, tree) {
     if (!tree.contains(ev.relatedTarget)) {
+      this._cancelDragOverRaf();
       this._clearDragVisuals(tree);
       this._dropTarget = null;
     }
@@ -797,6 +828,7 @@ ${branchSections.join("\n")}
 
   async _onDrop(ev, tree) {
     ev.preventDefault();
+    this._cancelDragOverRaf();
     this._stopAutoScroll();
     this._clearDragVisuals(tree);
     tree.querySelectorAll(".dtm-dragging").forEach(el => el.classList.remove("dtm-dragging"));
@@ -819,6 +851,7 @@ ${branchSections.join("\n")}
   _onDragEnd(_ev, tree) {
     this._drag = null;
     this._dropTarget = null;
+    this._cancelDragOverRaf();
     this._stopAutoScroll();
     this._clearDragVisuals(tree);
     tree.querySelectorAll(".dtm-dragging").forEach(el => el.classList.remove("dtm-dragging"));

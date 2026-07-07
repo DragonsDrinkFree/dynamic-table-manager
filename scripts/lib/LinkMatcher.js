@@ -66,13 +66,18 @@ export class LinkMatcher {
    * @returns {{ resultId:string, resultName:string, candidates:{name,uuid,img,tier}[] }[]}
    */
   static match(results, sourceEntries) {
+    // Precompute normalized forms once per entry/result — #scorePair runs
+    // O(results × entries) times and the regex/Set work dominates otherwise.
+    const prepped = sourceEntries.map(entry => ({ entry, ...LinkMatcher.#prep(entry.name) }));
+
     const out = [];
     for (const result of results) {
       if (result.type !== CONST.TABLE_RESULT_TYPES.TEXT) continue;
+      const resultPrep = LinkMatcher.#prep(result.name);
       const buckets = { perfect: [], decent: [], loose: [] };
-      for (const entry of sourceEntries) {
-        const tier = LinkMatcher.#scorePair(result.name, entry.name);
-        if (tier) buckets[tier].push({ ...entry, tier });
+      for (const p of prepped) {
+        const tier = LinkMatcher.#scorePair(resultPrep, p);
+        if (tier) buckets[tier].push({ ...p.entry, tier });
       }
       const candidates = [...buckets.perfect, ...buckets.decent, ...buckets.loose];
       if (candidates.length) {
@@ -85,12 +90,20 @@ export class LinkMatcher {
   // ---- Private helpers ----
 
   /**
-   * Return the best match tier between two names, or null if no match.
+   * Precompute the normalized string and keyword Set for a name.
+   */
+  static #prep(name) {
+    const norm = LinkMatcher.#normalize(name);
+    return { norm, keywords: new Set(norm.split(" ").filter(Boolean)) };
+  }
+
+  /**
+   * Return the best match tier between two prepped names, or null if no match.
    */
   static #scorePair(a, b) {
-    if (LinkMatcher.#normalize(a) === LinkMatcher.#normalize(b)) return "perfect";
-    const ka = LinkMatcher.#keywords(a);
-    const kb = LinkMatcher.#keywords(b);
+    if (a.norm === b.norm) return "perfect";
+    const ka = a.keywords;
+    const kb = b.keywords;
     if (ka.size > 0 && ka.size === kb.size && [...ka].every(k => kb.has(k))) return "decent";
     const shared = [...ka].filter(k => k.length >= 3 && kb.has(k));
     if (shared.length >= 1) return "loose";
@@ -109,10 +122,4 @@ export class LinkMatcher {
       .replace(/\s+/g, " ");
   }
 
-  /**
-   * Tokenize into a Set of keywords via #normalize then split on spaces.
-   */
-  static #keywords(s) {
-    return new Set(LinkMatcher.#normalize(s).split(" ").filter(Boolean));
-  }
 }

@@ -1,3 +1,5 @@
+import { DiceFormulaParser } from "./DiceFormulaParser.js";
+
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "avif"]);
 
 const DUMMY_RESULT_NAME = "Dynamic Table: Item Template";
@@ -239,7 +241,7 @@ export class ItemTemplateRoller {
             if (cachedBranchId) selectedBranch = action.branches.find(b => b.id === cachedBranchId);
           } else {
             const die = action.die ?? "d6";
-            const roll = await new Roll(`1${die}`).evaluate();
+            const roll = await new Roll(DiceFormulaParser.toRollFormula(die)).evaluate();
             for (const branch of action.branches) {
               if (branch.isElse) continue;
               if (roll.total >= (branch.low ?? 1) && roll.total <= (branch.high ?? 1)) {
@@ -427,7 +429,7 @@ export class ItemTemplateRoller {
 
     if (condition.mode === "dice") {
       const die = condition.die ?? "d6";
-      const roll = await new Roll(`1${die}`).evaluate();
+      const roll = await new Roll(DiceFormulaParser.toRollFormula(die)).evaluate();
       const low = condition.low ?? 1;
       const high = condition.high ?? 1;
       return roll.total >= low && roll.total <= high;
