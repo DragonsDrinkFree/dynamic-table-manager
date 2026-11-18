@@ -674,11 +674,21 @@ ${branchSections.join("\n")}
       <div class="dtm-attr-picker-list">${renderItems("")}</div>
     `;
 
+    // The picker is attached to <body>, outside this window, so it can't inherit the
+    // window's theme variables. Copy them over so it follows light/dark/system themes.
+    const winStyle = getComputedStyle(this.element);
+    for (const v of ["--background", "--color-text-primary", "--color-text-secondary",
+                     "--color-text-subtle", "--input-text-color", "--input-placeholder-color"]) {
+      const val = winStyle.getPropertyValue(v).trim();
+      if (val) picker.style.setProperty(v, val);
+    }
+
     const rect = anchorEl.getBoundingClientRect();
     const pickerW = 280;
     let left = rect.left;
     if (left + pickerW > window.innerWidth - 8) left = window.innerWidth - pickerW - 8;
-    picker.style.cssText = `left:${left}px;top:${rect.bottom + 4}px`;
+    picker.style.left = `${left}px`;
+    picker.style.top  = `${rect.bottom + 4}px`;
     document.body.appendChild(picker);
 
     const input = picker.querySelector("input");

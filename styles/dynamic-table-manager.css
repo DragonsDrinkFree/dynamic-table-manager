@@ -15,18 +15,18 @@
   border-radius: 4px;
   padding: 0 8px;
   font-size: 12px;
-  background: var(--color-bg-option, rgba(0, 0, 0, 0.3));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0, 0, 0, 0.3));
+  color: var(--input-text-color, #eee);
 }
 
 .dtm-search input::placeholder {
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--input-placeholder-color, #888);
 }
 
 .dtm-folder-create {
   background: none;
   border: none;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   cursor: pointer;
   padding: 2px 4px;
   font-size: 12px;
@@ -37,7 +37,7 @@
 }
 
 .dtm-folder-create:hover {
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   opacity: 1;
 }
 
@@ -75,7 +75,7 @@ button.dtm-create-table {
   font-size: 11px;
   font-weight: bold;
   text-transform: uppercase;
-  color: var(--color-text-light-tertiary, #999);
+  color: var(--color-text-subtle, #999);
   letter-spacing: 0.5px;
 }
 
@@ -94,8 +94,8 @@ button.dtm-create-table {
   border: 1px solid var(--color-border-light-tertiary, #555);
   border-radius: 3px;
   padding: 4px 8px;
-  background: var(--color-bg-option, rgba(0, 0, 0, 0.15));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0, 0, 0, 0.15));
+  color: var(--input-text-color, #eee);
   font-size: 13px;
 }
 
@@ -171,7 +171,7 @@ button.dtm-create-table {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   flex-shrink: 0;
 }
 
@@ -285,7 +285,7 @@ button.dtm-create-table {
   background: none;
   border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   cursor: pointer;
   padding: 1px 4px;
   font-size: 9px;
@@ -296,7 +296,7 @@ button.dtm-create-table {
 
 .dtm-type-all-btn:hover {
   opacity: 1;
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   border-color: var(--color-border-light-tertiary, #555);
 }
 
@@ -319,7 +319,7 @@ button.dtm-create-table {
   gap: 8px;
   padding: 7px 12px;
   font-size: 12px;
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   cursor: pointer;
   transition: background 0.1s;
 }
@@ -331,7 +331,7 @@ button.dtm-create-table {
 .dtm-type-menu-item i {
   width: 14px;
   text-align: center;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   font-size: 11px;
 }
 
@@ -356,7 +356,7 @@ button.dtm-create-table {
   align-items: center;
   justify-content: center;
   cursor: grab;
-  color: var(--color-text-light-tertiary, #666);
+  color: var(--color-text-subtle, #666);
   opacity: 0.4;
   transition: opacity 0.15s;
 }
@@ -397,8 +397,8 @@ button.dtm-create-table {
   border-radius: 3px;
   padding: 2px 6px;
   font-size: 12px;
-  background: var(--color-bg-option, rgba(0, 0, 0, 0.1));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0, 0, 0, 0.1));
+  color: var(--input-text-color, #eee);
 }
 
 .dtm-row input[type="text"]:focus,
@@ -408,15 +408,15 @@ button.dtm-create-table {
 }
 
 .dtm-row select option {
-  background: #1a1a2e;
-  color: #ddd;
+  background: var(--color-select-option-bg, #1a1a2e);
+  color: var(--input-text-color, #ddd);
 }
 
 /* Delete button */
 .dtm-col-actions button {
   background: none;
   border: none;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   cursor: pointer;
   padding: 4px;
   border-radius: 3px;
@@ -434,7 +434,7 @@ button.dtm-create-table {
   background: none;
   border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   cursor: pointer;
   padding: 2px 5px;
   font-size: 12px;
@@ -445,7 +445,7 @@ button.dtm-create-table {
 }
 
 .dtm-desc-btn:hover:not(:disabled) {
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   border-color: var(--color-border-light-tertiary, #555);
   background: rgba(255, 255, 255, 0.05);
 }
@@ -490,7 +490,7 @@ button.dtm-create-table {
 
 .dtm-drop-hint {
   font-size: 11px;
-  color: var(--color-text-light-tertiary, #777);
+  color: var(--color-text-subtle, #777);
   font-style: italic;
 }
 
@@ -504,7 +504,7 @@ button.dtm-create-table {
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   text-align: center;
 }
 
@@ -517,7 +517,7 @@ button.dtm-create-table {
 .dtm-jt-hint {
   padding: 6px 10px;
   font-size: 11px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   border-top: 1px solid var(--color-border-light-tertiary, #444);
   display: flex;
   align-items: baseline;
@@ -531,7 +531,7 @@ button.dtm-create-table {
   background: rgba(255, 255, 255, 0.07);
   border-radius: 2px;
   padding: 0 3px;
-  color: var(--color-text-light-secondary, #bbb);
+  color: var(--color-text-secondary, #bbb);
 }
 
 /* --- Create Table Dialog --- */
@@ -558,18 +558,18 @@ button.dtm-create-table {
   border-radius: 3px;
   padding: 4px 8px;
   font-size: 13px;
-  background: var(--color-bg-option, rgba(0, 0, 0, 0.15));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0, 0, 0, 0.15));
+  color: var(--input-text-color, #eee);
 }
 
 .dtm-create-dialog-container option {
-  background: #1a1a2e;
-  color: #ddd;
+  background: var(--color-select-option-bg, #1a1a2e);
+  color: var(--input-text-color, #ddd);
 }
 
 .dtm-create-dialog-container option:disabled {
-  background: #1a1a2e;
-  color: #666;
+  background: var(--color-select-option-bg, #1a1a2e);
+  color: var(--color-text-subtle, #666);
   font-style: italic;
 }
 
@@ -584,7 +584,7 @@ button.dtm-create-table {
 .dtm-link-btn {
   background: none;
   border: none;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   cursor: pointer;
   padding: 2px;
   border-radius: 3px;
@@ -643,7 +643,7 @@ input.dtm-col-range:disabled {
   align-items: center;
   gap: 5px;
   font-size: 12px;
-  color: var(--color-text-light-secondary, #ccc);
+  color: var(--color-text-secondary, #ccc);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
@@ -653,7 +653,7 @@ input.dtm-col-range:disabled {
   background: none;
   border: 1px solid var(--color-border-light-tertiary, #555);
   border-radius: 3px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   cursor: pointer;
   padding: 3px 8px;
   font-size: 11px;
@@ -663,7 +663,7 @@ input.dtm-col-range:disabled {
 }
 
 .dtm-reset-drawn-btn:hover {
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   border-color: var(--color-border-light-primary, #888);
 }
 
@@ -683,7 +683,7 @@ input.dtm-col-range:disabled {
 .dtm-drawn-btn {
   background: none;
   border: none;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   cursor: pointer;
   padding: 2px;
   border-radius: 3px;
@@ -743,8 +743,8 @@ input.dtm-col-range:disabled {
   padding: 6px 8px;
   font-size: 12px;
   font-family: var(--font-mono, "Courier New", monospace);
-  background: var(--color-bg-option, rgba(0, 0, 0, 0.15));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0, 0, 0, 0.15));
+  color: var(--input-text-color, #eee);
   resize: vertical;
   box-sizing: border-box;
 }
@@ -757,7 +757,7 @@ input.dtm-col-range:disabled {
   border-radius: 3px;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.06);
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
 }
 
 .dtm-btn-parse:hover {
@@ -789,16 +789,16 @@ input.dtm-col-range:disabled {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--color-text-light-tertiary, #999);
+  color: var(--color-text-subtle, #999);
 }
 
 .dtm-preview-formula {
-  color: var(--color-text-light-secondary, #ccc);
+  color: var(--color-text-secondary, #ccc);
 }
 
 .dtm-preview-count {
   margin-left: auto;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
 }
 
 .dtm-preview-rows {
@@ -823,7 +823,7 @@ input.dtm-col-range:disabled {
   flex: 0 0 36px;
   font-family: var(--font-mono, "Courier New", monospace);
   font-size: 11px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   text-align: right;
 }
 
@@ -832,7 +832,7 @@ input.dtm-col-range:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
 }
 
 /* --- Multi-column warning --- */
@@ -862,7 +862,7 @@ input.dtm-col-range:disabled {
 .dtm-multi-col-count {
   margin-left: auto;
   font-size: 11px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
 }
 
 .dtm-multi-col-tags {
@@ -877,11 +877,11 @@ input.dtm-col-range:disabled {
   background: rgba(255, 190, 80, 0.15);
   border: 1px solid rgba(255, 190, 80, 0.3);
   font-size: 11px;
-  color: var(--color-text-light-primary, #ddd);
+  color: var(--color-text-primary, #ddd);
 }
 
 .dtm-col-tag em {
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   font-style: normal;
 }
 
@@ -898,7 +898,7 @@ input.dtm-col-range:disabled {
   gap: 8px;
   font-size: 12px;
   cursor: pointer;
-  color: var(--color-text-light-primary, #ddd);
+  color: var(--color-text-primary, #ddd);
   line-height: 1.5;
   padding: 3px 6px;
   border-radius: 3px;
@@ -924,7 +924,7 @@ input.dtm-col-range:disabled {
 
 .dtm-radio-label em,
 .dtm-checkbox-label em {
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   font-style: normal;
 }
 
@@ -963,7 +963,7 @@ input.dtm-col-range:disabled {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: var(--color-text-light-tertiary, #999);
+  color: var(--color-text-subtle, #999);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -972,7 +972,7 @@ input.dtm-col-range:disabled {
 .dtm-preview-more {
   padding: 3px 10px;
   font-size: 10px;
-  color: var(--color-text-light-tertiary, #777);
+  color: var(--color-text-subtle, #777);
   font-style: italic;
 }
 
@@ -997,7 +997,7 @@ input.dtm-col-range:disabled {
 
 .dtm-btn-primary {
   background: var(--color-bg-btn-primary, #522e52);
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
 }
 
 .dtm-btn-primary:hover {
@@ -1076,7 +1076,7 @@ input.dtm-col-range:disabled {
   border-radius: 3px;
   cursor: pointer;
   background: transparent;
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
 }
 
 .dtm-page-nav button:disabled {
@@ -1091,8 +1091,8 @@ input.dtm-col-range:disabled {
   font-size: 12px;
   border: 1px solid var(--color-border-light-tertiary, #555);
   border-radius: 3px;
-  background: var(--color-bg-option, rgba(0, 0, 0, 0.2));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0, 0, 0, 0.2));
+  color: var(--input-text-color, #eee);
   padding: 0 4px;
   /* hide browser spinner arrows */
   -moz-appearance: textfield;
@@ -1105,7 +1105,7 @@ input.dtm-col-range:disabled {
 
 .dtm-page-total {
   font-size: 12px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   white-space: nowrap;
 }
 
@@ -1138,7 +1138,7 @@ input.dtm-col-range:disabled {
   width: 100%;
   height: 100%;
   min-height: 300px;
-  color: var(--color-text-light-tertiary, #666);
+  color: var(--color-text-subtle, #666);
   gap: 10px;
   text-align: center;
   font-size: 13px;
@@ -1153,7 +1153,7 @@ input.dtm-col-range:disabled {
 
 .dtm-pdf-empty-hint {
   font-size: 11px;
-  color: var(--color-text-light-tertiary, #555);
+  color: var(--color-text-subtle, #555);
 }
 
 /* Right pane */
@@ -1173,7 +1173,7 @@ input.dtm-col-range:disabled {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--color-text-light-tertiary, #999);
+  color: var(--color-text-subtle, #999);
   border-bottom: 1px solid var(--color-border-light-tertiary, #444);
   flex-shrink: 0;
 }
@@ -1183,7 +1183,7 @@ input.dtm-col-range:disabled {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.1);
   font-size: 10px;
-  color: var(--color-text-light-tertiary, #999);
+  color: var(--color-text-subtle, #999);
   white-space: nowrap;
 }
 
@@ -1283,7 +1283,7 @@ input.dtm-col-range:disabled {
 .dtm-instance-chevron {
   background: none;
   border: none;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   padding: 1px 4px;
   font-size: 10px;
   cursor: pointer;
@@ -1291,7 +1291,7 @@ input.dtm-col-range:disabled {
 }
 
 .dtm-instance-chevron:hover {
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
 }
 
 .dtm-instance-name {
@@ -1300,7 +1300,7 @@ input.dtm-col-range:disabled {
   height: 22px;
   border: 1px solid transparent;
   background: transparent;
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   font-size: 12px;
   font-weight: 600;
   padding: 1px 4px;
@@ -1316,7 +1316,7 @@ input.dtm-col-range:disabled {
 .dtm-instance-delete {
   background: none;
   border: none;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   cursor: pointer;
   padding: 2px 5px;
   border-radius: 3px;
@@ -1325,7 +1325,7 @@ input.dtm-col-range:disabled {
 }
 
 .dtm-instance-delete:hover {
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -1350,7 +1350,7 @@ input.dtm-col-range:disabled {
 }
 
 .dtm-ungrouped-icon {
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   padding: 0 4px;
   font-size: 10px;
 }
@@ -1359,7 +1359,7 @@ input.dtm-col-range:disabled {
   flex: 1 1 0;
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-light-secondary, #ccc);
+  color: var(--color-text-secondary, #ccc);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -1377,7 +1377,7 @@ input.dtm-col-range:disabled {
   height: 22px;
   border: 1px solid transparent;
   background: transparent;
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   font-size: 12px;
   padding: 1px 4px;
   border-radius: 3px;
@@ -1392,7 +1392,7 @@ input.dtm-col-range:disabled {
 .dtm-region-item button {
   background: none;
   border: none;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   cursor: pointer;
   padding: 2px 5px;
   border-radius: 3px;
@@ -1401,7 +1401,7 @@ input.dtm-col-range:disabled {
 }
 
 .dtm-region-item button:hover {
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -1409,7 +1409,7 @@ input.dtm-col-range:disabled {
   padding: 16px 10px;
   text-align: center;
   font-size: 11px;
-  color: var(--color-text-light-tertiary, #666);
+  color: var(--color-text-subtle, #666);
   font-style: italic;
   line-height: 1.5;
 }
@@ -1432,7 +1432,7 @@ input.dtm-col-range:disabled {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   margin-bottom: 2px;
 }
 
@@ -1447,7 +1447,7 @@ input.dtm-col-range:disabled {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   border-radius: 2px;
   margin-bottom: 1px;
 }
@@ -1473,7 +1473,7 @@ input.dtm-col-range:disabled {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--color-text-light-secondary, #ccc);
+  color: var(--color-text-secondary, #ccc);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -1490,8 +1490,8 @@ input.dtm-col-range:disabled {
   border-radius: 3px;
   padding: 1px 5px;
   font-size: 12px;
-  background: var(--color-bg-option, rgba(0, 0, 0, 0.15));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0, 0, 0, 0.15));
+  color: var(--input-text-color, #eee);
   box-sizing: border-box;
 }
 
@@ -1531,7 +1531,7 @@ input.dtm-col-range:disabled {
 
 .dtm-dl-summary-text {
   font-size: 12px;
-  color: var(--color-text-light-tertiary, #999);
+  color: var(--color-text-subtle, #999);
   margin-right: auto;
 }
 
@@ -1581,7 +1581,7 @@ input.dtm-col-range:disabled {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   border-bottom: 1px solid var(--color-border-light-tertiary, #444);
   flex-shrink: 0;
 }
@@ -1614,7 +1614,7 @@ input.dtm-col-range:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--color-text-light-secondary, #ccc);
+  color: var(--color-text-secondary, #ccc);
 }
 .dtm-dl-col-match {
   flex: 1 1 0;
@@ -1668,7 +1668,7 @@ input.dtm-col-range:disabled {
 /* Pending row: suggestion text */
 .dtm-dl-suggestion {
   font-size: 12px;
-  color: var(--color-text-light-secondary, #ccc);
+  color: var(--color-text-secondary, #ccc);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1689,8 +1689,8 @@ input.dtm-col-range:disabled {
   border-radius: 3px;
   padding: 2px 6px;
   font-size: 11px;
-  background: var(--color-bg-option, rgba(0,0,0,.15));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0,0,0,.15));
+  color: var(--input-text-color, #eee);
   box-sizing: border-box;
 }
 .dtm-link-dropdown {
@@ -1699,7 +1699,7 @@ input.dtm-col-range:disabled {
   left: 0;
   right: 0;
   z-index: 200;
-  background: #1a1a2e;
+  background: var(--background, #1a1a2e);
   border: 1px solid var(--color-border-light-tertiary, #555);
   border-top: none;
   border-radius: 0 0 3px 3px;
@@ -1713,13 +1713,13 @@ input.dtm-col-range:disabled {
   padding: 4px 8px;
   font-size: 12px;
   cursor: pointer;
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
 }
 .dtm-link-dropdown-item:hover { background: rgba(100, 160, 255, 0.1); }
 .dtm-link-dropdown-empty {
   padding: 6px 8px;
   font-size: 11px;
-  color: var(--color-text-light-tertiary, #777);
+  color: var(--color-text-subtle, #777);
   font-style: italic;
 }
 
@@ -1733,7 +1733,7 @@ input.dtm-col-range:disabled {
   border-radius: 3px;
   cursor: pointer;
   padding: 2px 6px;
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   font-size: 12px;
   max-width: 100%;
   overflow: hidden;
@@ -1756,7 +1756,7 @@ input.dtm-col-range:disabled {
 }
 .dtm-dl-denied-label {
   font-size: 11px;
-  color: var(--color-text-light-tertiary, #666);
+  color: var(--color-text-subtle, #666);
   font-style: italic;
 }
 
@@ -1775,7 +1775,7 @@ input.dtm-col-range:disabled {
   background: rgba(80, 200, 100, 0.12);
   color: rgba(130, 220, 140, 1);
 }
-.dtm-dl-deny-btn { color: var(--color-text-light-tertiary, #888); }
+.dtm-dl-deny-btn { color: var(--color-text-subtle, #888); }
 .dtm-dl-deny-btn:hover { color: #ff4444; background: rgba(255,68,68,.1); }
 
 /* Footer */
@@ -1804,7 +1804,7 @@ input.dtm-col-range:disabled {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--color-text-light-tertiary, #999);
+  color: var(--color-text-subtle, #999);
 }
 
 .dtm-source-select {
@@ -1814,19 +1814,19 @@ input.dtm-col-range:disabled {
   border-radius: 3px;
   padding: 2px 6px;
   font-size: 13px;
-  background: var(--color-bg-option, rgba(0, 0, 0, 0.3));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0, 0, 0, 0.3));
+  color: var(--input-text-color, #eee);
 }
 
 .dtm-source-select optgroup,
 .dtm-source-select option {
-  background: #1a1a2e;
-  color: #ddd;
+  background: var(--color-select-option-bg, #1a1a2e);
+  color: var(--input-text-color, #ddd);
 }
 
 .dtm-source-hint {
   font-size: 11px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   margin: 0;
 }
 
@@ -1858,7 +1858,7 @@ input.dtm-col-range:disabled {
 }
 
 .dtm-doc-picker-search > i {
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   font-size: 11px;
   flex-shrink: 0;
 }
@@ -1868,21 +1868,21 @@ input.dtm-col-range:disabled {
   background: none;
   border: none;
   outline: none;
-  color: var(--color-text-light-primary, #eee);
+  color: var(--input-text-color, #eee);
   font-size: 13px;
   padding: 0;
   min-width: 0;
 }
 
 .dtm-doc-picker-input::placeholder {
-  color: var(--color-text-light-tertiary, #666);
+  color: var(--input-placeholder-color, #666);
   font-size: 11px;
 }
 
 .dtm-doc-picker-hint {
   padding: 12px;
   font-size: 12px;
-  color: var(--color-text-light-tertiary, #777);
+  color: var(--color-text-subtle, #777);
   font-style: italic;
   text-align: center;
   flex-shrink: 0;
@@ -1904,7 +1904,7 @@ input.dtm-col-range:disabled {
   padding: 5px 10px;
   cursor: pointer;
   font-size: 12px;
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   transition: background 0.1s;
   min-width: 0;
 }
@@ -1926,7 +1926,7 @@ input.dtm-col-range:disabled {
   width: 20px;
   text-align: center;
   flex-shrink: 0;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   font-size: 11px;
 }
 
@@ -1940,7 +1940,7 @@ input.dtm-col-range:disabled {
 
 .dtm-doc-tag {
   font-size: 10px;
-  color: var(--color-text-light-tertiary, #777);
+  color: var(--color-text-subtle, #777);
   flex-shrink: 0;
   max-width: 90px;
   overflow: hidden;
@@ -1975,7 +1975,7 @@ input.dtm-col-range:disabled {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--color-text-light-tertiary, #999);
+  color: var(--color-text-subtle, #999);
 }
 
 .dtm-jt-meta-btn {
@@ -1983,7 +1983,7 @@ input.dtm-col-range:disabled {
   border: 1px dashed var(--color-border-light-tertiary, #555);
   border-radius: 3px;
   background: var(--color-bg-option, rgba(0,0,0,0.1));
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   font-size: 12px;
   text-align: left;
   padding: 0 8px;
@@ -2000,7 +2000,7 @@ input.dtm-col-range:disabled {
 }
 
 .dtm-jt-meta-btn em {
-  color: var(--color-text-light-tertiary, #777);
+  color: var(--color-text-subtle, #777);
   font-style: italic;
 }
 
@@ -2021,7 +2021,7 @@ input.dtm-col-range:disabled {
   background: none;
   border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   cursor: pointer;
   padding: 3px 6px;
   font-size: 11px;
@@ -2043,7 +2043,7 @@ input.dtm-col-range:disabled {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   flex-shrink: 0;
 }
 
@@ -2073,7 +2073,7 @@ input.dtm-col-range:disabled {
   border: 1px dashed var(--color-border-light-tertiary, #555);
   border-radius: 3px;
   background: var(--color-bg-option, rgba(0,0,0,0.1));
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
   font-size: 12px;
   text-align: left;
   padding: 0 8px;
@@ -2091,7 +2091,7 @@ input.dtm-col-range:disabled {
 }
 
 .dtm-jt-source-btn em {
-  color: var(--color-text-light-tertiary, #777);
+  color: var(--color-text-subtle, #777);
   font-style: italic;
 }
 
@@ -2115,8 +2115,8 @@ input.dtm-col-range:disabled {
   border-radius: 3px;
   padding: 2px 6px;
   font-size: 12px;
-  background: var(--color-bg-option, rgba(0,0,0,0.1));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0,0,0,0.1));
+  color: var(--input-text-color, #eee);
   -moz-appearance: textfield;
 }
 
@@ -2125,7 +2125,7 @@ input.dtm-col-range:disabled {
 
 .dtm-jt-config-label {
   font-size: 12px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   flex-shrink: 0;
 }
 
@@ -2135,14 +2135,14 @@ input.dtm-col-range:disabled {
   border-radius: 3px;
   padding: 2px 4px;
   font-size: 12px;
-  background: var(--color-bg-option, rgba(0,0,0,0.1));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0,0,0,0.1));
+  color: var(--input-text-color, #eee);
   flex: 0 0 56px;
 }
 
 .dtm-jt-die option {
-  background: #1a1a2e;
-  color: #ddd;
+  background: var(--color-select-option-bg, #1a1a2e);
+  color: var(--input-text-color, #ddd);
 }
 
 .dtm-jt-trigger {
@@ -2153,8 +2153,8 @@ input.dtm-col-range:disabled {
   padding: 2px 6px;
   font-size: 12px;
   font-family: var(--font-mono, "Courier New", monospace);
-  background: var(--color-bg-option, rgba(0,0,0,0.1));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0,0,0,0.1));
+  color: var(--input-text-color, #eee);
   min-width: 0;
 }
 
@@ -2219,7 +2219,7 @@ input.dtm-col-range:disabled {
 .dtm-it-picker-name {
   flex: 1;
   font-size: 12px;
-  color: var(--color-text-light-secondary, #ccc);
+  color: var(--color-text-secondary, #ccc);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2297,14 +2297,14 @@ input.dtm-col-range:disabled {
 
 /* ── Branch range inputs (inside conditional section bars) ── */
 .dtm-it-branch-num   { flex: 0 0 38px; width: 38px; font-size: 11px; text-align: center; }
-.dtm-it-branch-sep   { flex-shrink: 0; font-size: 11px; color: var(--color-text-light-tertiary, #888); }
+.dtm-it-branch-sep   { flex-shrink: 0; font-size: 11px; color: var(--color-text-subtle, #888); }
 .dtm-it-branch-label { flex: 0 0 80px; width: 80px; font-size: 11px; }
 
 .dtm-it-col-label { flex: 1 1 0; min-width: 60px; font-size: 12px; }
 
 .dtm-it-table-name {
   font-size: 11px;
-  color: var(--color-text-light-secondary, #ccc);
+  color: var(--color-text-secondary, #ccc);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2389,7 +2389,7 @@ input.dtm-col-range:disabled {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: var(--color-text-light-tertiary, #777);
+  color: var(--color-text-subtle, #777);
   flex-shrink: 0;
   margin-right: 2px;
 }
@@ -2435,7 +2435,7 @@ input.dtm-col-range:disabled {
   flex-shrink: 0;
   cursor: grab;
   padding: 0 3px;
-  color: var(--color-text-light-tertiary, #666);
+  color: var(--color-text-subtle, #666);
   opacity: 0.4;
   user-select: none;
   font-size: 12px;
@@ -2468,12 +2468,12 @@ input.dtm-col-range:disabled {
   cursor: pointer;
   padding: 2px 5px;
   border-radius: 3px;
-  color: var(--color-text-light-tertiary, #888);
+  color: var(--color-text-subtle, #888);
   font-size: 12px;
   line-height: 1;
 }
 
-.dtm-icon-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--color-text-light-primary, #eee); }
+.dtm-icon-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--color-text-primary, #eee); }
 .dtm-icon-btn.dtm-active { color: rgba(140, 200, 255, 0.9); background: rgba(100, 160, 240, 0.15); }
 .dtm-icon-btn.dtm-danger:hover { color: rgba(220, 80, 80, 1); background: rgba(200, 60, 60, 0.12); }
 
@@ -2484,7 +2484,7 @@ input.dtm-col-range:disabled {
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  color: var(--color-text-light-tertiary, #777);
+  color: var(--color-text-subtle, #777);
   text-align: center;
   gap: 4px;
 }
@@ -2500,7 +2500,8 @@ input.dtm-col-range:disabled {
   flex-direction: column;
   width: 280px;
   max-height: 320px;
-  background: var(--color-bg-option, #1e1e2e);
+  background: var(--background, #1e1e2e);
+  color: var(--color-text-primary, #eee);
   border: 1px solid var(--color-border-light-tertiary, #555);
   border-radius: 5px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
@@ -2523,7 +2524,7 @@ input.dtm-col-range:disabled {
   background: none;
   border: none;
   outline: none;
-  color: var(--color-text-light-primary, #eee);
+  color: var(--input-text-color, #eee);
   font-size: 12px;
 }
 
@@ -2538,7 +2539,7 @@ input.dtm-col-range:disabled {
   border-radius: 3px;
   font-family: var(--font-mono, "Courier New", monospace);
   font-size: 11px;
-  color: var(--color-text-light-secondary, #ccc);
+  color: var(--color-text-secondary, #ccc);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -2547,13 +2548,13 @@ input.dtm-col-range:disabled {
 
 .dtm-attr-picker-item:hover {
   background: rgba(100, 160, 255, 0.15);
-  color: var(--color-text-light-primary, #eee);
+  color: var(--color-text-primary, #eee);
 }
 
 .dtm-attr-picker-empty {
   padding: 10px 8px;
   font-size: 11px;
-  color: var(--color-text-light-tertiary, #777);
+  color: var(--color-text-subtle, #777);
   font-style: italic;
 }
 
@@ -2580,7 +2581,7 @@ input.dtm-col-range:disabled {
 
 .dtm-at-doc-name {
   font-style: italic;
-  color: var(--color-text-light-secondary, #ccc);
+  color: var(--color-text-secondary, #ccc);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2637,7 +2638,7 @@ input.dtm-col-range:disabled {
   flex: 0 0 auto;
   font-weight: bold;
   font-size: 11px;
-  color: var(--color-text-light-tertiary, #999);
+  color: var(--color-text-subtle, #999);
   white-space: nowrap;
 }
 
@@ -2715,7 +2716,7 @@ input.dtm-col-range:disabled {
 
 .dtm-ts-group-name-input:hover,
 .dtm-ts-group-name-input:focus {
-  background: var(--color-bg-option, rgba(0,0,0,0.2));
+  background: var(--input-background-color, rgba(0,0,0,0.2));
   border-color: var(--color-border-light-tertiary, #555);
   outline: none;
 }
@@ -2809,8 +2810,8 @@ input.dtm-col-range:disabled {
   resize: none;
   border: 1px solid var(--color-border-light-tertiary, #555);
   border-radius: 3px;
-  background: var(--color-bg-option, rgba(0,0,0,0.2));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0,0,0,0.2));
+  color: var(--input-text-color, #eee);
   padding: 4px 6px;
 }
 
@@ -2852,8 +2853,8 @@ input.dtm-col-range:disabled {
   font-size: 11px;
   border: 1px solid var(--color-border-light-tertiary, #555);
   border-radius: 3px;
-  background: var(--color-bg-option, rgba(0,0,0,0.2));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0,0,0,0.2));
+  color: var(--input-text-color, #eee);
   padding: 2px 5px;
   min-height: 0; height: auto;
 }
@@ -2866,8 +2867,8 @@ input.dtm-col-range:disabled {
   font-size: 11px;
   border: 1px solid var(--color-border-light-tertiary, #555);
   border-radius: 3px;
-  background: var(--color-bg-option, rgba(0,0,0,0.2));
-  color: var(--color-text-light-primary, #eee);
+  background: var(--input-background-color, rgba(0,0,0,0.2));
+  color: var(--input-text-color, #eee);
   padding: 2px 4px;
   min-height: 0; height: auto;
 }

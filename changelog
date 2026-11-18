@@ -1,3 +1,6 @@
+# v1.7.2
+## Minor
+- Just a quick fix to some theming issues caused by CSS choices linked against foundry. Coloration should be more sane when using non standard light/dark themes.
 # v1.7.1
 
 ## Minor
